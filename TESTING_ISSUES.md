@@ -10,38 +10,36 @@ P2 = noticeable friction / polish
 P3 = minor polish
 
 ## Priorities
-1. P1 - Alpha-scoped AI task batch includes Beta-scoped tasks
-2. P1 - Budget gate blocks milestone generation with misleading "pinned" copy
-3. P1 - AI task generation appends without grouping or replace/confirm
-4. P1 - "Clear focus" does not clear; it switches to another in-progress task
-5. P1 - Milestone input requires Enter with no visible affordance
+1. P1 - Milestone-scoped AI tasks include out-of-scope milestone content without warning
+2. P1 - Pinned tasks are not preserved on regenerate
+3. P2 - Pinned-tasks helper text lacks strong visual cue
 
 ## Issues
 
-1. P1 - Milestone input requires Enter with no visible affordance
-   Impact: New users may type a milestone and not know how to add it.
-   Evidence: Sidebar milestone input has no visible add button; Enter works but is not signposted.
-   Suggested fix: Add a visible "Add" button or inline helper text (e.g., "Press Enter to add").
+1. P1 - Milestone-scoped AI tasks include out-of-scope milestone content without warning
+   Impact: Users receive tasks from the wrong milestone, undermining trust in scoped generation.
+   Evidence: Generating M1 tasks included analytics/reporting (M2) content with no scope warning shown.
+   Suggested fix: Enforce milestone filter in generation or post-filter, and show a scope warning if any tasks were removed.
 
-2. P2 - Two milestone entry points can feel redundant
+2. P1 - Pinned tasks are not preserved on regenerate
+   Impact: Users lose intentionally pinned tasks when regenerating, contradicting the helper text and expected behavior.
+   Evidence: After pinning 2 M2 tasks and clicking "Regenerate tasks (AI)", all tasks reverted to unpinned.
+   Suggested fix: Preserve pinned tasks across regenerate; if pinned tasks are removed, show a clear warning and require confirmation.
+
+3. P2 - Pinned-tasks helper text lacks strong visual cue
+   Impact: Users miss the guidance that pinned tasks should be preserved, leading to confusion when regenerating.
+   Evidence: Note “Pinned tasks are kept when regenerating.” is visually subtle and easy to overlook.
+   Suggested fix: Add a stronger visual cue (icon, callout, or highlighted helper below the regenerate button).
+
+4. P2 - Two milestone entry points can feel redundant
    Impact: Users may be unsure where to add milestones (sidebar input vs plan "Add milestone").
    Evidence: Sidebar has "New milestone..." input while plan area also offers "Add milestone".
    Suggested fix: Consolidate to one primary entry point or explain the difference.
 
-3. P2 - Activity Trail appears global, not date-scoped
+5. P2 - Activity Trail appears global, not date-scoped
    Impact: When date changes to 2026-02-23, the trail still shows 2026-02-22 events; may confuse users expecting date-specific history.
    Evidence: After switching the date, Activity Trail still lists the previous day's events.
    Suggested fix: Filter the trail by selected date or label it clearly as "All activity".
-
-4. P1 - AI task generation appends without grouping or replace/confirm
-   Impact: Running AI tasks for a different milestone produces a second task set with no separator or milestone label; list becomes long and confusing.
-   Evidence: After selecting "Approved one-page sitemap and wireframes" and clicking "Generate tasks (AI)", the new tasks appended after existing AI tasks with no grouping or duplicate/replace prompt.
-   Suggested fix: Add a confirm modal (append vs replace), or group tasks by milestone with clear headings.
-
-5. P1 - "Clear focus" does not clear; it switches to another in-progress task
-   Impact: Users may expect Focus to reset/empty, but it instead jumps to another task (if any are in "doing"), which feels like it ignored the action.
-   Evidence: In Focus view after marking a task done, clicking "Clear focus" moved focus to another task already in "doing".
-   Suggested fix: Either actually clear the focus (empty state) or rename the action to "Switch to active task" / explain behavior.
 
 6. P2 - Landing header feels like a stray label (tiny and top-left)
    Impact: First impression is weak; brand/context is unclear and the page feels unanchored.
@@ -103,7 +101,15 @@ P3 = minor polish
    Evidence: AI tasks — Milestone Alpha - Onboarding included "Generate Beta-only AI task set (control)" and "Run coherence QA: Beta task set" in the Alpha batch.
    Suggested fix: Enforce milestone filter before generation and/or post-filter outputs to remove cross-milestone tasks.
 
-18. P1 - Budget gate blocks milestone generation with misleading "pinned" copy
-   Impact: Users are blocked from generating the next milestone even when nothing is pinned; the message suggests pinned tasks are the cause.
-   Evidence: After generating M1 tasks, selecting M2 and clicking "Generate tasks (AI)" showed "Pinned tasks already fill today's budget" despite no pinned tasks.
-   Suggested fix: Separate milestone generation from daily budget, or update the message to reflect actual blocking reason and offer replace/append options.
+## Resolved (from 2026-02-22 run)
+1. P1 - Milestone input requires Enter with no visible affordance
+   Resolution: Visible "Add" button and helper text "Press Enter or click Add to create a milestone" now present.
+
+2. P1 - "Clear focus" does not clear; it switches to another in-progress task
+   Resolution: "Clear focus" now leaves empty state and does not auto-advance.
+
+3. P1 - Budget gate blocks milestone generation with misleading "pinned" copy
+   Resolution: Budget-full callout now reads "Today's budget is full" with options "Replace unpinned" and "Increase budget."
+
+4. P1 - AI task generation appends without grouping or replace/confirm
+   Resolution: AI task batches are grouped by milestone with clear headings and use replace flow when budget is full.

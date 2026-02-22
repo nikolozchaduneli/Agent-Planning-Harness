@@ -32,23 +32,45 @@ const responseSchema = z.object({
   tasks: z.array(taskSchema).min(1),
 });
 
-const fallbackTasks = [
-  {
-    title: "Define today's target outcome",
-    description: "Write a 2-3 sentence definition of success for today.",
-    estimateMinutes: 15,
-  },
-  {
-    title: "Break goal into 3 concrete steps",
-    description: "List the three smallest deliverables that move the goal forward.",
-    estimateMinutes: 25,
-  },
-  {
-    title: "Deliver the first step",
-    description: "Complete the most important deliverable end-to-end.",
-    estimateMinutes: 60,
-  },
-];
+const getFallbackTasks = (milestoneTitle?: string | null) => {
+  const trimmedMilestone = milestoneTitle?.trim();
+  if (trimmedMilestone) {
+    return [
+      {
+        title: `Clarify ${trimmedMilestone} scope`,
+        description: "List in-scope deliverables and explicitly note exclusions.",
+        estimateMinutes: 20,
+      },
+      {
+        title: `Define ${trimmedMilestone} success criteria`,
+        description: "Write acceptance criteria and measurable outcomes for this milestone.",
+        estimateMinutes: 30,
+      },
+      {
+        title: `Outline the execution plan for ${trimmedMilestone}`,
+        description: "Sequence the key tasks needed to deliver this milestone.",
+        estimateMinutes: 40,
+      },
+    ];
+  }
+  return [
+    {
+      title: "Define today's target outcome",
+      description: "Write a 2-3 sentence definition of success for today.",
+      estimateMinutes: 15,
+    },
+    {
+      title: "Break goal into 3 concrete steps",
+      description: "List the three smallest deliverables that move the goal forward.",
+      estimateMinutes: 25,
+    },
+    {
+      title: "Deliver the first step",
+      description: "Complete the most important deliverable end-to-end.",
+      estimateMinutes: 60,
+    },
+  ];
+};
 
 const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
   const focusNotes = payload.constraints.focusNotes?.trim();
@@ -66,9 +88,13 @@ const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
     otherMilestones.length > 0
       ? `\nOther milestones (avoid overlap): ${otherMilestones.join(" | ")}`
       : "";
+  const forbiddenMilestonesContext =
+    otherMilestones.length > 0
+      ? `\nDO NOT include tasks for these milestones: ${otherMilestones.join(" | ")}`
+      : "";
   return `
 Project: ${payload.projectName || 'Unspecified'}
-Goal: ${payload.goal}${milestoneContext}${milestonesContext}${otherMilestonesContext}
+Goal: ${payload.goal}${milestoneContext}${milestonesContext}${otherMilestonesContext}${forbiddenMilestonesContext}
 Time budget (minutes): ${budget ?? "unspecified"}
 Focus notes: ${focusNotes || "none"}
 User notes: ${payload.notes?.trim() || "none"}
@@ -139,7 +165,7 @@ export async function POST(request: Request) {
   const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-10-21";
 
   if ((!endpoint && !responsesUrl) || !apiKey || !deployment) {
-    return NextResponse.json({ tasks: fallbackTasks });
+    return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
   }
 
   const normalize = (value: string) =>
@@ -213,28 +239,54 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ tasks: fallbackTasks });
+      return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
     }
 
     const data = await response.json();
     const content = getOutputText(data);
     if (!content || typeof content !== "string") {
-      return NextResponse.json({ tasks: fallbackTasks });
+      return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
     }
 
     let payload: unknown;
     try {
       payload = extractJson(content);
     } catch {
-      return NextResponse.json({ tasks: fallbackTasks });
+      return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
     }
     const validated = responseSchema.safeParse(payload);
     if (!validated.success) {
-      return NextResponse.json({ tasks: fallbackTasks });
+      return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
     }
 
-    return NextResponse.json(validated.data);
+    const milestoneTitle = parsed.data.milestoneTitle?.trim();
+    const otherMilestones = milestoneTitle
+      ? (parsed.data.milestones ?? [])
+          .map((milestone) => milestone.title.trim())
+          .filter((title) => title && title.toLowerCase() !== milestoneTitle.toLowerCase())
+      : [];
+    let tasks = validated.data.tasks;
+    let filteredCount = 0;
+
+    if (milestoneTitle && otherMilestones.length > 0) {
+      const forbidden = otherMilestones.map((title) => title.toLowerCase());
+      const filtered = tasks.filter((task) => {
+        const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();
+        return !forbidden.some((title) => haystack.includes(title));
+      });
+      filteredCount = tasks.length - filtered.length;
+      tasks = filtered;
+    }
+
+    if (tasks.length === 0) {
+      tasks = getFallbackTasks(milestoneTitle);
+    }
+
+    return NextResponse.json({
+      tasks,
+      ...(filteredCount > 0 ? { scopeWarning: { filteredCount } } : {}),
+    });
   } catch {
-    return NextResponse.json({ tasks: fallbackTasks });
+    return NextResponse.json({ tasks: getFallbackTasks(parsed.data.milestoneTitle) });
   }
 }

@@ -78,6 +78,7 @@ export default function Home() {
   const [projectGoal, setProjectGoal] = useState("");
   const [projectBudget, setProjectBudget] = useState(240);
   const [projectFocus, setProjectFocus] = useState("");
+  const [projectCreationPath, setProjectCreationPath] = useState<"manual" | "ai">("manual");
   const [formErrors, setFormErrors] = useState<{ name?: string; goal?: string }>({});
   const [planNotes, setPlanNotes] = useState("");
   const [notesFromVoice, setNotesFromVoice] = useState<string | null>(null);
@@ -90,30 +91,69 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingMilestones, setIsGeneratingMilestones] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiScopeWarning, setAiScopeWarning] = useState<string | null>(null);
+  const [budgetPulse, setBudgetPulse] = useState(false);
+  const [plannedTick, setPlannedTick] = useState(false);
+  const [regenBudgetMessage, setRegenBudgetMessage] = useState<string | null>(null);
   const [aiPrompt, setAiPrompt] = useState<{
+    mode: "regenerate" | "budgetFull";
     pinnedCount: number;
     unpinnedCount: number;
     remainingAppend: number;
     remainingReplace: number;
+    remainingReplaceAll: number;
     removeTaskIds: string[];
+    removeAllTaskIds: string[];
   } | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [activeRecordingField, setActiveRecordingField] = useState<string | null>(null);
   const activeRecordingCallback = useRef<((transcript: string) => void) | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const plannedTickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const budgetPulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevPlannedRef = useRef(0);
   const [brainstormInput, setBrainstormInput] = useState("");
   const [isBrainstorming, setIsBrainstorming] = useState(false);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [showBudgetOverride, setShowBudgetOverride] = useState(false);
   const [budgetOverrideDraft, setBudgetOverrideDraft] = useState("");
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(true);
+  const [showStickyRegen, setShowStickyRegen] = useState(false);
+  const [shouldScrollToRegenMessage, setShouldScrollToRegenMessage] = useState(false);
+  const [focusHighlight, setFocusHighlight] = useState<"aiPrompt" | "regenMessage" | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   const newMilestoneInputRef = useRef<HTMLInputElement | null>(null);
+  const milestoneDropdownRef = useRef<HTMLDivElement | null>(null);
+  const regenMessageRef = useRef<HTMLDivElement | null>(null);
+  const aiPromptRef = useRef<HTMLDivElement | null>(null);
+  const focusHighlightTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [projectDrafts, setProjectDrafts] = useState<Record<string, {
+    name: string;
+    goal: string;
+    constraints: { timeBudgetMinutes: number; focusNotes?: string };
+  }>>({});
+  const [dirtyProjectIds, setDirtyProjectIds] = useState<Record<string, boolean>>({});
 
   const selectedProject = projects.find((project) => project.id === ui.selectedProjectId);
   const selectedDate = ui.selectedDate || isoToday();
+  const isAnyProjectDirty = Object.values(dirtyProjectIds).some(Boolean);
+
+  const buildProjectDraft = (project: typeof selectedProject) => ({
+    name: project?.name || "",
+    goal: project?.goal || "",
+    constraints: {
+      timeBudgetMinutes: project?.constraints.timeBudgetMinutes ?? 0,
+      focusNotes: project?.constraints.focusNotes || "",
+    },
+  });
+
+  const activeProjectDraft = selectedProject
+    ? projectDrafts[selectedProject.id] ?? buildProjectDraft(selectedProject)
+    : null;
+  const isProjectDirty = selectedProject ? !!dirtyProjectIds[selectedProject.id] : false;
 
   const isFirstRun = projects.length === 0;
 
@@ -128,11 +168,60 @@ export default function Home() {
   const planTasks = tasks.filter((task) => planTaskIds.includes(task.id));
   const totalPlanned = planTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
   const budget = activePlan?.timeBudgetOverrideMinutes ?? selectedProject?.constraints.timeBudgetMinutes ?? 0;
+  const isOverBudget = budget > 0 && totalPlanned > budget;
+  const budgetPercent = budget > 0 ? Math.min(100, Math.round((totalPlanned / budget) * 100)) : 0;
+  const hasPlanTasks = planTasks.length > 0;
   const projectMilestones = milestones.filter((m) => m.projectId === selectedProject?.id);
   const selectedMilestone = selectedMilestoneId
     ? projectMilestones.find((m) => m.id === selectedMilestoneId)
     : undefined;
   const hasBudgetOverride = typeof activePlan?.timeBudgetOverrideMinutes === "number";
+  const shouldShowStickyBar = showStickyRegen && !!selectedProject && hasPlanTasks;
+
+  useEffect(() => {
+    if (prevPlannedRef.current === totalPlanned) return;
+    if (plannedTickTimeout.current) clearTimeout(plannedTickTimeout.current);
+    if (budgetPulseTimeout.current) clearTimeout(budgetPulseTimeout.current);
+    setPlannedTick(true);
+    setBudgetPulse(true);
+    plannedTickTimeout.current = setTimeout(() => setPlannedTick(false), 250);
+    budgetPulseTimeout.current = setTimeout(() => setBudgetPulse(false), 250);
+    prevPlannedRef.current = totalPlanned;
+  }, [totalPlanned]);
+
+  useEffect(() => {
+    if (regenBudgetMessage) setRegenBudgetMessage(null);
+  }, [totalPlanned, budget, selectedMilestoneId]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    const projectId = selectedProject.id;
+    const isDirty = dirtyProjectIds[projectId];
+    const existingDraft = projectDrafts[projectId];
+    const freshDraft = buildProjectDraft(selectedProject);
+    const isSameDraft =
+      !!existingDraft &&
+      existingDraft.name === freshDraft.name &&
+      existingDraft.goal === freshDraft.goal &&
+      existingDraft.constraints.timeBudgetMinutes === freshDraft.constraints.timeBudgetMinutes &&
+      (existingDraft.constraints.focusNotes || "") === (freshDraft.constraints.focusNotes || "");
+    if (!existingDraft || (!isDirty && !isSameDraft)) {
+      setProjectDrafts((prev) => ({
+        ...prev,
+        [projectId]: freshDraft,
+      }));
+    }
+  }, [selectedProject, projectDrafts, dirtyProjectIds]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isAnyProjectDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isAnyProjectDirty]);
   const milestoneTitleById = useMemo(() => {
     const map = new Map<string, string>();
     projectMilestones.forEach((m) => map.set(m.id, m.title));
@@ -181,6 +270,48 @@ useEffect(() => {
     setShowMilestonePrompt(false);
   }
 }, [projectMilestones.length, selectedProject?.id]);
+
+useEffect(() => {
+  if (ui.activeView !== "plan") {
+    setShowStickyRegen(false);
+    return;
+  }
+  const target = milestoneDropdownRef.current;
+  if (!target) return;
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      setShowStickyRegen(!entry.isIntersecting);
+    },
+    { root: null, threshold: 0 },
+  );
+  observer.observe(target);
+  return () => observer.disconnect();
+}, [ui.activeView, selectedProject?.id, selectedMilestoneId, hasPlanTasks]);
+
+useEffect(() => {
+  if (!shouldScrollToRegenMessage) return;
+  if (aiPrompt && aiPromptRef.current) {
+    aiPromptRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFocusHighlight("aiPrompt");
+    setShouldScrollToRegenMessage(false);
+    return;
+  }
+  if (regenBudgetMessage && regenMessageRef.current) {
+    regenMessageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFocusHighlight("regenMessage");
+    setShouldScrollToRegenMessage(false);
+    return;
+  }
+}, [shouldScrollToRegenMessage, aiPrompt, regenBudgetMessage]);
+
+useEffect(() => {
+  if (!focusHighlight) return;
+  if (focusHighlightTimeout.current) clearTimeout(focusHighlightTimeout.current);
+  focusHighlightTimeout.current = setTimeout(() => setFocusHighlight(null), 1200);
+  return () => {
+    if (focusHighlightTimeout.current) clearTimeout(focusHighlightTimeout.current);
+  };
+}, [focusHighlight]);
 
 useEffect(() => {
   if (!showBudgetOverride && !hasBudgetOverride) return;
@@ -304,25 +435,68 @@ const handleAddMilestone = () => {
   setNewMilestoneTitle("");
 };
 
-const buildAiScope = () => {
-  const scopeMilestoneId = selectedMilestone?.id;
-  const scopeTasks = planTasks.filter(
-    (task) =>
-      task.source === "ai" &&
-      (scopeMilestoneId ? task.milestoneId === scopeMilestoneId : !task.milestoneId),
-  );
-  return { scopeMilestoneId, scopeTasks };
+const updateProjectDraft = (patch: {
+  name?: string;
+  goal?: string;
+  constraints?: { timeBudgetMinutes?: number; focusNotes?: string };
+}) => {
+  if (!selectedProject) return;
+  const projectId = selectedProject.id;
+  setProjectDrafts((prev) => {
+    const base = prev[projectId] ?? buildProjectDraft(selectedProject);
+    const next = {
+      ...base,
+      ...patch,
+      constraints: {
+        ...base.constraints,
+        ...patch.constraints,
+      },
+    };
+    return { ...prev, [projectId]: next };
+  });
+  setDirtyProjectIds((prev) => ({ ...prev, [projectId]: true }));
 };
+
+const handleSaveProjectSettings = () => {
+  if (!selectedProject || !activeProjectDraft) return;
+  updateProject(selectedProject.id, {
+    name: activeProjectDraft.name.trim(),
+    goal: activeProjectDraft.goal,
+    constraints: {
+      ...selectedProject.constraints,
+      timeBudgetMinutes: Number(activeProjectDraft.constraints.timeBudgetMinutes) || 0,
+      focusNotes: activeProjectDraft.constraints.focusNotes?.trim() || undefined,
+    },
+  });
+  setDirtyProjectIds((prev) => ({ ...prev, [selectedProject.id]: false }));
+};
+
+const handleCancelProjectSettings = () => {
+  if (!selectedProject) return;
+  const projectId = selectedProject.id;
+  setProjectDrafts((prev) => ({
+    ...prev,
+    [projectId]: buildProjectDraft(selectedProject),
+  }));
+  setDirtyProjectIds((prev) => ({ ...prev, [projectId]: false }));
+};
+
+  const buildAiScope = () => {
+    const scopeMilestoneId = selectedMilestone?.id;
+    const scopeTasks = planTasks.filter(
+      (task) =>
+        task.source === "ai" &&
+        (scopeMilestoneId ? task.milestoneId === scopeMilestoneId : true),
+    );
+    return { scopeMilestoneId, scopeTasks };
+  };
 
 const computeRemainingBudget = (removedEstimate: number) =>
   Math.max(0, (budget || 0) - (totalPlanned - removedEstimate));
 
 const runAiGeneration = async (remainingBudget: number, removeTaskIds: string[]) => {
   if (!selectedProject) return;
-  if (remainingBudget <= 0) {
-    setAiError("Pinned tasks already fill today's budget.");
-    return;
-  }
+  if (remainingBudget <= 0) return;
   if (removeTaskIds.length > 0) {
     removeTasks(removeTaskIds);
     detachTasksFromPlan(selectedDate, selectedProject.id, removeTaskIds);
@@ -330,6 +504,7 @@ const runAiGeneration = async (remainingBudget: number, removeTaskIds: string[])
   }
   setIsGenerating(true);
   setAiError(null);
+  setAiScopeWarning(null);
   ensurePlan();
   try {
     const response = await fetch("/api/ai/generate-tasks", {
@@ -352,6 +527,12 @@ const runAiGeneration = async (remainingBudget: number, removeTaskIds: string[])
     const data = await response.json();
     if (!response.ok || !data?.tasks) {
       throw new Error("AI response invalid");
+    }
+    if (data.scopeWarning?.filteredCount) {
+      const count = Number(data.scopeWarning.filteredCount) || 0;
+      if (count > 0) {
+        setAiScopeWarning(`Removed ${count} task${count === 1 ? "" : "s"} that referenced other milestones.`);
+      }
     }
     const now = new Date().toISOString();
     const batchId = crypto.randomUUID();
@@ -388,25 +569,96 @@ const handleGenerateTasks = async (skipMilestonePrompt?: boolean) => {
     return;
   }
 
+  setAiError(null);
+  setRegenBudgetMessage(null);
   const { scopeTasks } = buildAiScope();
   const pinnedTasks = scopeTasks.filter((task) => task.pinned);
   const unpinnedTasks = scopeTasks.filter((task) => !task.pinned);
   const removedEstimate = unpinnedTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
   const remainingReplace = computeRemainingBudget(removedEstimate);
+  const removedEstimateAll = scopeTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
+  const remainingReplaceAll = computeRemainingBudget(removedEstimateAll);
   const remainingAppend = computeRemainingBudget(0);
+  const unpinnedAiPlanTasks = planTasks.filter(
+    (task) => task.source === "ai" && !task.pinned,
+  );
+  const planPinnedAiCount = planTasks.filter(
+    (task) => task.source === "ai" && task.pinned,
+  ).length;
+  const removedPlanEstimate = unpinnedAiPlanTasks.reduce(
+    (sum, task) => sum + task.estimateMinutes,
+    0,
+  );
+  const remainingPlanReplace = computeRemainingBudget(removedPlanEstimate);
+
+  const pinnedMinutes = pinnedTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
+  if (budget > 0 && scopeTasks.length > 0 && pinnedMinutes >= budget) {
+    setRegenBudgetMessage(
+      `Your kept tasks already fill ${formatMinutes(budget)}. Free up time by removing a task or adjusting estimates.`,
+    );
+    return;
+  }
 
   if (scopeTasks.length === 0) {
+    if (remainingAppend <= 0) {
+      setAiPrompt({
+        mode: "budgetFull",
+        pinnedCount: planPinnedAiCount,
+        unpinnedCount: unpinnedAiPlanTasks.length,
+        remainingAppend,
+        remainingReplace: remainingPlanReplace,
+        remainingReplaceAll: remainingPlanReplace,
+        removeTaskIds: unpinnedAiPlanTasks.map((task) => task.id),
+        removeAllTaskIds: planTasks.filter((task) => task.source === "ai").map((task) => task.id),
+      });
+      return;
+    }
+    setShouldScrollToRegenMessage(false);
     await runAiGeneration(remainingAppend, []);
     return;
   }
 
+  if (remainingAppend > 0 && unpinnedTasks.length === 0) {
+    setShouldScrollToRegenMessage(false);
+    await runAiGeneration(remainingAppend, []);
+    return;
+  }
+
+  if (remainingAppend > 0 && unpinnedTasks.length > 0) {
+    setAiPrompt({
+      mode: "regenerate",
+      pinnedCount: pinnedTasks.length,
+      unpinnedCount: unpinnedTasks.length,
+      remainingAppend,
+      remainingReplace,
+      remainingReplaceAll,
+      removeTaskIds: unpinnedTasks.map((task) => task.id),
+      removeAllTaskIds: scopeTasks.map((task) => task.id),
+    });
+    return;
+  }
+
+  if (remainingReplace > 0) {
+    setShouldScrollToRegenMessage(false);
+    await runAiGeneration(remainingReplace, unpinnedTasks.map((task) => task.id));
+    return;
+  }
+
   setAiPrompt({
+    mode: "regenerate",
     pinnedCount: pinnedTasks.length,
     unpinnedCount: unpinnedTasks.length,
     remainingAppend,
     remainingReplace,
+    remainingReplaceAll,
     removeTaskIds: unpinnedTasks.map((task) => task.id),
+    removeAllTaskIds: scopeTasks.map((task) => task.id),
   });
+};
+
+const handleStickyGenerate = async () => {
+  setShouldScrollToRegenMessage(true);
+  await handleGenerateTasks();
 };
 
 const handleProposeMilestones = async () => {
@@ -463,6 +715,18 @@ const clearPlanBudgetOverride = () => {
 };
 
 const focusTask = tasks.find((task) => task.id === ui.focusTaskId);
+const scopedAiTasks = useMemo(() => {
+  const scopeMilestoneId = selectedMilestone?.id;
+  return planTasks.filter(
+    (task) =>
+      task.source === "ai" &&
+      (scopeMilestoneId ? task.milestoneId === scopeMilestoneId : true),
+  );
+}, [planTasks, selectedMilestone?.id]);
+const scopedPinnedAiCount = useMemo(
+  () => scopedAiTasks.filter((task) => task.pinned).length,
+  [scopedAiTasks],
+);
 
 const projectHistory = useMemo(() => {
   const lookbackDays = 10;
@@ -671,7 +935,7 @@ return (
                     </svg>
                   </button>
                 </div>
-                <p className="text-sm text-[var(--muted)]">{selectedProject.goal}</p>
+                <p className="text-sm text-[var(--muted)] break-words break-all">{selectedProject.goal}</p>
 
                 {/* Project Status */}
                 <div className="mt-2 rounded-xl border border-[rgba(15,23,42,0.05)] bg-white p-3 shadow-sm">
@@ -762,13 +1026,13 @@ return (
                     <button
                       type="button"
                       onClick={handleAddMilestone}
-                      className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+                      className="rounded-full bg-[var(--accent)] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:-translate-y-0.5"
                     >
                       Add
                     </button>
                   </div>
                   <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Press Enter to add
+                    Press Enter or click Add to create a milestone
                   </p>
                 </div>
               </div>
@@ -883,8 +1147,21 @@ return (
                       </div>
                       <h2 className="text-3xl font-semibold mb-3 tracking-tight">Project Drawing Board</h2>
                       <p className="text-[var(--muted)] text-lg max-w-sm mx-auto leading-relaxed">
-                        Pitch me an idea. I'll help you architect the scope, milestones, and constraints before we build.
+                        Pitch me an idea. I&apos;ll help you architect the scope, milestones, and constraints before we build.
                       </p>
+                      {isFirstRun && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProjectCreationPath("manual");
+                            setView("projects");
+                            setTimeout(() => document.getElementById("project-name-input")?.focus(), 0);
+                          }}
+                          className="mt-6 rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                        >
+                          Back to manual setup
+                        </button>
+                      )}
                     </div>
                   )}
                   {brainstormMessages.map((msg) => (
@@ -998,7 +1275,7 @@ return (
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] uppercase font-bold tracking-[0.1em] text-[var(--muted)]/60">Core Goal</label>
-                        <p className="text-sm leading-relaxed text-[var(--ink)]/80 italic">"{activeDraft.goal || "Sketching the mission..."}"</p>
+                        <p className="text-sm leading-relaxed text-[var(--ink)]/80 italic">&ldquo;{activeDraft.goal || "Sketching the mission..."}&rdquo;</p>
                       </div>
 
                       {activeDraft.milestones.length > 0 && (
@@ -1078,12 +1355,49 @@ return (
                   Anchor your day around one project. The plan follows the project.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className={`rounded-2xl border p-4 shadow-sm transition ${projectCreationPath === "manual"
+                  ? "border-[var(--accent)] bg-white/95"
+                  : "border-[rgba(15,23,42,0.12)] bg-white/80"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Manual setup</p>
+                  <p className="mt-2 text-sm text-[var(--ink)]">
+                    Fill out the project details yourself and start planning right away.
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Default path
+                  </div>
+                </div>
+                <div className={`rounded-2xl border p-4 shadow-sm transition ${projectCreationPath === "ai"
+                  ? "border-[var(--accent)] bg-white/95"
+                  : "border-[rgba(15,23,42,0.12)] bg-white/80"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">AI-assisted</p>
+                  <p className="mt-2 text-sm text-[var(--ink)]">
+                    Jump into the Drawing Board to shape your goal, milestones, and constraints with AI.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProjectCreationPath("ai");
+                      setView("brainstorm");
+                      setTimeout(() => document.getElementById("brainstorm-input")?.focus(), 0);
+                    }}
+                    className="mt-3 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow transition hover:-translate-y-0.5"
+                  >
+                    Start in Drawing Board
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 items-start">
                 <div className="grid gap-3">
                   <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                     Project name <span className="text-red-400">*</span>
                   </label>
                   <input
+                    id="project-name-input"
                     value={projectName}
                     onChange={(event) => { setProjectName(event.target.value); setFormErrors(prev => ({ ...prev, name: undefined })); }}
                     className={`rounded-2xl border bg-[var(--panel)] px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] ${formErrors.name ? "border-red-400" : "border-transparent"}`}
@@ -1093,12 +1407,13 @@ return (
                 </div>
                 <div className="grid gap-3">
                   <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Daily time budget (minutes)
+                    Daily time <span className="text-[var(--muted)]/70">(minutes)</span>
                   </label>
                   <input
                     type="number"
                     min={15}
                     max={720}
+                    placeholder="Minutes"
                     value={projectBudget || ""}
                     onFocus={(e) => e.target.select()}
                     onChange={(event) => setProjectBudget(event.target.value === "" ? 0 : Number(event.target.value))}
@@ -1156,7 +1471,7 @@ return (
                         {project.constraints.timeBudgetMinutes} mins/day
                       </p>
                       <h4 className="text-lg">{project.name}</h4>
-                      <p className="text-sm text-[var(--muted)]">{project.goal}</p>
+                      <p className="text-sm text-[var(--muted)] break-words break-all">{project.goal}</p>
                     </button>
                   ))}
                 </div>
@@ -1173,12 +1488,28 @@ return (
                     Manage details and milestones for {selectedProject.name}
                   </p>
                 </div>
-                <button
-                  onClick={() => setSelectedProject(undefined)}
-                  className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
-                >
-                  Start New Project
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleCancelProjectSettings}
+                    disabled={!isProjectDirty}
+                    className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)] shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveProjectSettings}
+                    disabled={!isProjectDirty}
+                    className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                  >
+                    Save changes
+                  </button>
+                  <button
+                    onClick={() => setSelectedProject(undefined)}
+                    className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                  >
+                    Start New Project
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1187,22 +1518,27 @@ return (
                     Project name
                   </label>
                   <input
-                    value={selectedProject.name}
-                    onChange={(event) => updateProject(selectedProject.id, { name: event.target.value })}
+                    value={activeProjectDraft?.name || ""}
+                    onChange={(event) => updateProjectDraft({ name: event.target.value })}
                     className="rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   />
                 </div>
-                <div className="grid gap-3">
+                <div className="grid gap-3 self-start">
                   <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Daily time budget (minutes)
+                    Daily time <span className="text-[var(--muted)]/70">(minutes)</span>
                   </label>
                   <input
                     type="number"
                     min={15}
                     max={720}
-                    value={selectedProject.constraints.timeBudgetMinutes || ""}
+                    placeholder="Minutes"
+                    value={activeProjectDraft?.constraints.timeBudgetMinutes || ""}
                     onFocus={(e) => e.target.select()}
-                    onChange={(event) => updateProject(selectedProject.id, { constraints: { ...selectedProject.constraints, timeBudgetMinutes: event.target.value === "" ? 0 : Number(event.target.value) } })}
+                    onChange={(event) =>
+                      updateProjectDraft({
+                        constraints: { timeBudgetMinutes: event.target.value === "" ? 0 : Number(event.target.value) },
+                      })
+                    }
                     className="rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   />
                 </div>
@@ -1211,8 +1547,8 @@ return (
                     Project goal
                   </label>
                   <textarea
-                    value={selectedProject.goal}
-                    onChange={(event) => updateProject(selectedProject.id, { goal: event.target.value })}
+                    value={activeProjectDraft?.goal || ""}
+                    onChange={(event) => updateProjectDraft({ goal: event.target.value })}
                     rows={3}
                     className="rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   />
@@ -1222,8 +1558,8 @@ return (
                     Focus notes
                   </label>
                   <textarea
-                    value={selectedProject.constraints.focusNotes || ""}
-                    onChange={(event) => updateProject(selectedProject.id, { constraints: { ...selectedProject.constraints, focusNotes: event.target.value } })}
+                    value={activeProjectDraft?.constraints.focusNotes || ""}
+                    onChange={(event) => updateProjectDraft({ constraints: { focusNotes: event.target.value } })}
                     rows={2}
                     className="rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   />
@@ -1331,78 +1667,78 @@ return (
           )}
 
           {ui.activeView === "plan" && (
-            <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)]">
+            <>
+            <section className={`grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] ${selectedProject ? "pb-24" : ""}`}>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl">Daily plan</h2>
+                  <h2 className="text-2xl mb-2">
+                    Daily Plan for{" "}
+                    <span className="font-semibold text-[var(--accent)]">
+                      {selectedProject ? selectedProject.name : "your project"}
+                    </span>
+                  </h2>
                   <p className="text-sm text-[var(--muted)]">
-                    {selectedProject ? selectedProject.goal : "Pick a project to begin."}
+                    Generate, review, and organize today&apos;s tasks and notes for one focused project.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[var(--panel)] px-4 py-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span>
-                      Planned: <span className="font-semibold">{formatMinutes(totalPlanned)}</span>
-                    </span>
-                    <span className="text-[var(--muted)]">|</span>
-                    <span>
-                      Budget:{" "}
-                      <span className={totalPlanned > budget ? "text-red-600" : "font-semibold"}>
-                        {formatMinutes(budget || 0)}
-                      </span>{" "}
-                      <span className="text-xs text-[var(--muted)]">
-                        ({hasBudgetOverride ? "override" : "default"})
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="flex items-center gap-2">
+                        Planned:{" "}
+                        <span
+                          className={`inline-block font-semibold tabular-nums transition-all duration-200 ${
+                            plannedTick
+                              ? "text-[var(--accent)] -translate-y-0.5"
+                              : isOverBudget
+                                ? "text-red-600"
+                                : "text-[var(--ink)]"
+                          }`}
+                        >
+                          {formatMinutes(totalPlanned)}
+                        </span>
                       </span>
-                    </span>
-                    {!hasBudgetOverride && !showBudgetOverride && (
-                      <button
-                        type="button"
-                        onClick={() => setShowBudgetOverride(true)}
-                        className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:opacity-80"
-                      >
-                        Override today
-                      </button>
-                    )}
-                    {showBudgetOverride && !hasBudgetOverride && (
-                      <button
-                        type="button"
-                        onClick={() => setShowBudgetOverride(false)}
-                        className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] transition hover:text-[var(--ink)]"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    {hasBudgetOverride && !showBudgetOverride && (
-                      <button
-                        type="button"
-                        onClick={() => setShowBudgetOverride(true)}
-                        className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:opacity-80"
-                      >
-                        Edit
-                      </button>
-                    )}
-                    {hasBudgetOverride && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearPlanBudgetOverride();
-                          setShowBudgetOverride(false);
-                        }}
-                        className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] transition hover:text-[var(--ink)]"
-                      >
-                        Reset
-                      </button>
-                    )}
+                      <span className="text-[var(--muted)]">|</span>
+                      <span>
+                        Budget:{" "}
+                        <span className={isOverBudget ? "text-red-600" : "font-semibold"}>
+                          {formatMinutes(budget || 0)}
+                        </span>{" "}
+                        <span className="text-xs text-[var(--muted)]">
+                          ({hasBudgetOverride ? "override" : "default"})
+                        </span>
+                      </span>
+                      {!showBudgetOverride && (
+                        <button
+                          type="button"
+                          onClick={() => setShowBudgetOverride(true)}
+                          className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:opacity-80"
+                        >
+                          Adjust today&apos;s time
+                        </button>
+                      )}
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-white/80 shadow-inner">
+                      {budgetPercent > 0 && (
+                        <div
+                          className={`h-2 rounded-full origin-left transition-all duration-200 ${
+                            isOverBudget ? "bg-red-500" : "bg-[var(--accent)]"
+                          } ${budgetPulse ? "scale-[1.02] shadow-sm ring-2 ring-[var(--accent)]/30" : "scale-100"}`}
+                          style={{ width: `${budgetPercent}%` }}
+                        />
+                      )}
+                    </div>
                   </div>
                   {showBudgetOverride && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                        Override minutes
+                        Time for today
                       </span>
                       <input
                         type="number"
                         min={30}
                         max={720}
+                        placeholder="Minutes"
                         value={budgetOverrideDraft}
                         onFocus={(e) => e.target.select()}
                         onChange={(event) => setBudgetOverrideDraft(event.target.value)}
@@ -1425,11 +1761,30 @@ return (
                         }}
                         className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:opacity-80"
                       >
-                        Apply
+                        Save
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBudgetOverride(false)}
+                        className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] transition hover:text-[var(--ink)]"
+                      >
+                        Cancel
+                      </button>
+                      {hasBudgetOverride && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            clearPlanBudgetOverride();
+                            setShowBudgetOverride(false);
+                          }}
+                          className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] transition hover:text-[var(--ink)]"
+                        >
+                          Reset
+                        </button>
+                      )}
                     </div>
                   )}
-                  {totalPlanned > budget && budget > 0 && (
+                  {isOverBudget && budget > 0 && (
                     <p className="mt-1 text-xs text-red-500">
                       Over budget by {formatMinutes(totalPlanned - budget)} - remove a task or adjust estimates.
                     </p>
@@ -1446,12 +1801,11 @@ return (
               {selectedProject && (
                 <>
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Milestones - Tasks</p>
-                      <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Target Milestone (Optional)</label>
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <div ref={milestoneDropdownRef} className="flex flex-col gap-2 pb-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-medium text-[var(--ink)]">Generate tasks for</span>
                         <select
-                          className="w-full rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] md:flex-1"
+                          className="flex-1 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                           value={selectedMilestoneId}
                           onChange={(e) => setSelectedMilestoneId(e.target.value)}
                         >
@@ -1460,22 +1814,9 @@ return (
                             <option key={m.id} value={m.id}>{m.title}</option>
                           ))}
                         </select>
-                        <button
-                          onClick={() => handleGenerateTasks()}
-                          disabled={isGenerating}
-                          className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-xs uppercase tracking-[0.25em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60 md:self-start"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-                          </svg>
-                          {isGenerating ? "Generating..." : "Generate tasks (AI)"}
-                        </button>
                       </div>
                       <p className="text-xs text-[var(--muted)]">
-                        Pick a milestone to scope AI tasks. Whole Project includes everything.
-                      </p>
-                      <p className="text-xs text-[var(--muted)]">
-                        AI uses: <span className="font-semibold">{selectedMilestone?.title || "Whole Project"}</span>
+                        Leave &quot;Whole Project&quot; to include everything.
                       </p>
                       {projectMilestones.length === 0 && !showMilestonePrompt && (
                         <div className="rounded-xl border border-dashed border-[rgba(15,23,42,0.15)] bg-white/70 p-3 text-xs text-[var(--muted)]">
@@ -1541,17 +1882,16 @@ return (
                         </div>
                       )}
                       {aiPrompt && (
-                        <div className="rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/90 p-4 text-xs text-[var(--ink)]">
-                          <p className="text-[var(--ink)] font-semibold">Regenerate AI tasks?</p>
+                        <div
+                          ref={aiPromptRef}
+                          className={`rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/90 p-4 text-xs text-[var(--ink)] ${focusHighlight === "aiPrompt" ? "attention-highlight" : ""}`}
+                        >
+                          <p className="text-[var(--ink)] font-semibold">
+                            You&apos;re about to replace one of your milestone tasks by another&apos;s.
+                          </p>
                           <p className="mt-1 text-[var(--muted)]">
-                            Keep {aiPrompt.pinnedCount} pinned task{aiPrompt.pinnedCount === 1 ? "" : "s"} and replace {aiPrompt.unpinnedCount} unpinned.
+                            If there are tasks you want to keep, mark them as Keep first.
                           </p>
-                          <p className="mt-2 text-[var(--muted)]">
-                            Remaining budget: {aiPrompt.remainingReplace}m (replace) / {aiPrompt.remainingAppend}m (append)
-                          </p>
-                          {aiPrompt.remainingReplace <= 0 && (
-                            <p className="mt-2 text-red-600">Pinned tasks already fill today&apos;s budget.</p>
-                          )}
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -1563,20 +1903,21 @@ return (
                               }}
                               className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
                             >
-                              Regenerate unpinned
+                              Replace Unkept Tasks
                             </button>
-                            <button
-                              type="button"
-                              disabled={aiPrompt.remainingAppend <= 0}
-                              onClick={() => {
-                                const next = aiPrompt;
-                                setAiPrompt(null);
-                                runAiGeneration(next.remainingAppend, []);
-                              }}
-                              className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:-translate-y-0.5 disabled:opacity-50"
-                            >
-                              Append new batch
-                            </button>
+                            {aiPrompt.mode === "budgetFull" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAiPrompt(null);
+                                  setBudgetOverrideDraft(`${budget || ""}`);
+                                  setShowBudgetOverride(true);
+                                }}
+                                className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:-translate-y-0.5 disabled:opacity-50"
+                              >
+                                Adjust today&apos;s time
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setAiPrompt(null)}
@@ -1587,11 +1928,12 @@ return (
                           </div>
                         </div>
                       )}
+                      {aiScopeWarning && <p className="text-xs text-amber-700">{aiScopeWarning}</p>}
                       {aiError && <p className="text-xs text-red-600">{aiError}</p>}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                        Plan notes (optional)
+                      <label className="text-sm font-semibold text-[var(--muted)]">
+                        Today&apos;s Notes
                       </label>
                       <div className="relative flex items-center focus-within:ring-2 focus-within:ring-[var(--ring)] rounded-2xl shadow-[0_0_0_1px_rgba(15,23,42,0.1)] bg-[var(--panel)]">
                         <textarea
@@ -1599,7 +1941,7 @@ return (
                           onChange={(event) => setPlanNotes(event.target.value)}
                           rows={2}
                           className="w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-3 placeholder:text-sm focus:outline-none pr-12"
-                          placeholder="Meeting at 2pm. Prioritize shipping the onboarding flow."
+                          placeholder="What should you remember while working today?"
                         />
                         <div className="absolute right-2 top-2">
                           <DictationMic
@@ -1612,6 +1954,12 @@ return (
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-1 text-sm font-semibold text-[var(--muted)]">
+                    <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
+                    <span>Manual Tasks</span>
+                    <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
                   </div>
 
                   <div className="grid gap-3 rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/90 p-4">
@@ -1636,15 +1984,19 @@ return (
                           />
                         </div>
                       </div>
-                      <input
-                        type="number"
-                        min={5}
-                        max={240}
-                        value={manualEstimate || ""}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(event) => setManualEstimate(event.target.value === "" ? 0 : Number(event.target.value))}
-                        className="w-24 rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ink)]/70">Time (min)</span>
+                        <input
+                          type="number"
+                          min={5}
+                          max={240}
+                          placeholder="Minutes"
+                          value={manualEstimate || ""}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(event) => setManualEstimate(event.target.value === "" ? 0 : Number(event.target.value))}
+                          className="w-24 rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                        />
+                      </div>
                       <button
                         onClick={handleAddManualTask}
                         className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-4 py-2 text-xs uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
@@ -1678,14 +2030,14 @@ return (
                               </div>
                             )}
                             <div
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(15,23,42,0.2)] bg-white p-4 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.5)]"
+                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(15,23,42,0.32)] bg-white/95 p-4 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.6)]"
                             >
                               <div className="min-w-[220px] flex-1">
-                                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                                <span className="inline-flex rounded-full bg-[var(--panel)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)] mb-2">
                                   {task.source === "ai" ? "AI task" : "Manual task"}
-                                </p>
+                                </span>
                                 <h4
-                                  className={`text-lg font-semibold ${isLong ? "line-clamp-2 cursor-pointer hover:opacity-80" : ""}`}
+                                  className={`text-xl font-semibold text-[var(--ink)] ${isLong ? "line-clamp-2 cursor-pointer hover:opacity-80" : ""}`}
                                   onClick={(e) => {
                                     if (isLong) {
                                       const el = e.currentTarget;
@@ -1698,49 +2050,72 @@ return (
                                   <p className="text-sm text-[var(--muted)]">{task.description}</p>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min={5}
-                                  max={240}
-                                  value={task.estimateMinutes || ""}
-                                  onFocus={(e) => e.target.select()}
-                                  onChange={(event) =>
-                                    updateTaskEstimate(task.id, event.target.value === "" ? 0 : Number(event.target.value))
-                                  }
-                                  className="w-20 rounded-xl border border-transparent bg-[var(--panel)] px-2 py-1 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                                />
-                                {task.source === "ai" && (
+                              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Time (min)</span>
+                                    <input
+                                      type="number"
+                                      min={5}
+                                      max={240}
+                                      value={task.estimateMinutes || ""}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(event) =>
+                                        updateTaskEstimate(task.id, event.target.value === "" ? 0 : Number(event.target.value))
+                                      }
+                                      className="w-24 rounded-xl border border-transparent bg-[var(--panel)] px-2 py-1 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                    />
+                                  </div>
+                                  {task.source === "ai" && (
+                                    <button
+                                      onClick={() => toggleTaskPinned(task.id)}
+                                      title="Prevents replacement"
+                                      className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] shadow transition hover:-translate-y-0.5 ${task.pinned
+                                        ? "border-[var(--accent)] bg-[rgba(249,115,22,0.12)] text-[var(--accent)]"
+                                        : "border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
+                                        }`}
+                                    >
+                                      <span className="inline-flex items-center gap-1">
+                                        {task.pinned && (
+                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                          </svg>
+                                        )}
+                                        {task.pinned ? "Kept" : "Keep"}
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
                                   <button
-                                    onClick={() => toggleTaskPinned(task.id)}
-                                    className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] shadow transition hover:-translate-y-0.5 ${task.pinned
-                                      ? "border-[var(--accent)] bg-[rgba(249,115,22,0.12)] text-[var(--accent)]"
-                                      : "border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
+                                    onClick={() => {
+                                      setFocusTask(task.id);
+                                      setView("focus");
+                                    }}
+                                    className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-xs uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+                                  >
+                                    <span className="inline-flex items-center gap-1">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M14 3h7v7" />
+                                        <path d="M10 14L21 3" />
+                                        <path d="M5 7v12h12" />
+                                      </svg>
+                                      Send to Focus
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")
+                                    }
+                                    className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] shadow transition ${task.status === "done"
+                                      ? "bg-emerald-500 text-white"
+                                      : "bg-[var(--accent)] text-white"
                                       }`}
                                   >
-                                    {task.pinned ? "Pinned" : "Pin"}
+                                    {task.status === "done" ? "Done" : "Mark done"}
                                   </button>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    setFocusTask(task.id);
-                                    setView("focus");
-                                  }}
-                                  className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-xs uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
-                                >
-                                  Focus
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")
-                                  }
-                                  className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] shadow transition ${task.status === "done"
-                                    ? "bg-emerald-500 text-white"
-                                    : "border border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
-                                    }`}
-                                >
-                                  {task.status === "done" ? "Done" : "Mark done"}
-                                </button>
+                                </div>
                               </div>
                             </div>
                           </Fragment>
@@ -1748,9 +2123,70 @@ return (
                       });
                     })()}
                   </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        setShouldScrollToRegenMessage(true);
+                        handleGenerateTasks();
+                      }}
+                      disabled={isGenerating}
+                      className="flex items-center justify-center gap-2 self-start rounded-full bg-[var(--accent)] px-5 py-3 text-xs uppercase tracking-[0.25em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                        <path d="M21 3v6h-6" />
+                      </svg>
+                      {isGenerating
+                        ? "Generating..."
+                        : hasPlanTasks
+                          ? "Regenerate Suggestions"
+                          : "Generate Suggestions"}
+                    </button>
+                    {scopedAiTasks.length > 0 && (
+                      <p className="text-xs text-[var(--muted)]">
+                        Keeps tasks marked Keep.
+                      </p>
+                    )}
+                    <div
+                      ref={regenMessageRef}
+                      className={focusHighlight === "regenMessage" ? "attention-highlight rounded-xl" : ""}
+                    >
+                      {regenBudgetMessage && (
+                        <p className="text-xs text-[var(--ink)]">{regenBudgetMessage}</p>
+                      )}
+                    </div>
+                  </div>
                 </>
               )}
             </section>
+            {shouldShowStickyBar && (
+              <div className="fixed bottom-4 left-1/2 z-40 w-[min(960px,calc(100vw-2rem))] -translate-x-1/2">
+                <div className="flex h-14 items-center justify-between gap-3 rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/95 px-4 shadow-[0_-6px_18px_-12px_rgba(15,23,42,0.5)] backdrop-blur">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="text-[11px] font-semibold text-[var(--muted)]">Milestone</span>
+                    <select
+                      className="min-w-[160px] max-w-[260px] truncate rounded-full border border-transparent bg-[var(--panel)] px-3 py-2 text-xs shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      value={selectedMilestoneId}
+                      onChange={(e) => setSelectedMilestoneId(e.target.value)}
+                    >
+                      <option value="">Whole Project</option>
+                      {projectMilestones.map((m) => (
+                        <option key={m.id} value={m.id}>{m.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleStickyGenerate}
+                    disabled={isGenerating}
+                    className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
+                  >
+                    {isGenerating ? "Generating..." : "Regenerate Suggestions"}
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {ui.activeView === "focus" && (
@@ -1893,47 +2329,72 @@ return (
 
     {/* RIGHT SIDEBAR: Activity Log */}
     {!isFirstRun && ui.activeView !== "brainstorm" && (
-      <aside className="no-scrollbar flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-[rgba(15,23,42,0.08)] bg-white/60 p-6 shadow-sm transition-all duration-600 ease-out">
-        <div className="mb-6 flex items-center justify-between gap-2">
-          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
-            Activity Trail
-          </h3>
-          {selectedProject && (
-            <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] shadow">
-              <button
-                onClick={() => setShowAllActivity(false)}
-                className={`rounded-full px-2 py-1 ${!showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
-              >
-                Today
-              </button>
-              <button
-                onClick={() => setShowAllActivity(true)}
-                className={`rounded-full px-2 py-1 ${showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
-              >
-                All
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-4">
-          {!selectedProject && <p className="text-sm text-[var(--muted)] italic">Select a project.</p>}
-          {selectedProject && scopedActivities.length === 0 && (
-            <p className="text-sm text-[var(--muted)]">
-              {showAllActivity ? "No activity logged yet." : `No activity for ${selectedDate}.`}
-            </p>
-          )}
-          {selectedProject && scopedActivities.map((activity) => (
-            <div key={activity.id} className="flex gap-3 text-sm">
-              <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]" />
-              <div>
-                <p className="text-[var(--ink)]">{activity.description}</p>
-                <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-[var(--muted)]">
-                  {new Date(activity.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </p>
+      <aside
+        className={`no-scrollbar flex flex-shrink-0 flex-col overflow-y-auto border-l border-[rgba(15,23,42,0.08)] bg-white/60 shadow-sm transition-all duration-600 ease-out ${showActivitySidebar ? "w-72 p-6" : "w-12 p-3"}`}
+      >
+        {!showActivitySidebar && (
+          <button
+            type="button"
+            onClick={() => setShowActivitySidebar(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(15,23,42,0.12)] bg-white text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)] shadow transition hover:text-[var(--ink)]"
+            title="Show activity"
+          >
+            Activity
+          </button>
+        )}
+        {showActivitySidebar && (
+          <>
+            <div className="mb-6 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+                Activity Trail
+              </h3>
+              <div className="flex items-center gap-2">
+                {selectedProject && (
+                  <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] shadow">
+                    <button
+                      onClick={() => setShowAllActivity(false)}
+                      className={`rounded-full px-2 py-1 ${!showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => setShowAllActivity(true)}
+                      className={`rounded-full px-2 py-1 ${showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
+                    >
+                      All
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowActivitySidebar(false)}
+                  className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)] transition hover:text-[var(--ink)]"
+                >
+                  Hide
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="flex flex-col gap-4">
+              {!selectedProject && <p className="text-sm text-[var(--muted)] italic">Select a project.</p>}
+              {selectedProject && scopedActivities.length === 0 && (
+                <p className="text-sm text-[var(--muted)]">
+                  {showAllActivity ? "No activity logged yet." : `No activity for ${selectedDate}.`}
+                </p>
+              )}
+              {selectedProject && scopedActivities.map((activity) => (
+                <div key={activity.id} className="flex gap-3 text-sm">
+                  <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]" />
+                  <div>
+                    <p className="text-[var(--ink)]">{activity.description}</p>
+                    <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-[var(--muted)]">
+                      {new Date(activity.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </aside>
     )}
   </div>
