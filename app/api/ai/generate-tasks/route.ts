@@ -4,26 +4,14 @@ import { z } from "zod";
 const requestSchema = z.object({
   projectId: z.string().min(1),
   goal: z.string().min(1),
+  projectName: z.string().optional(),
+  milestoneTitle: z.string().optional(),
   constraints: z.object({
     timeBudgetMinutes: z.number().int().positive().optional(),
     focusNotes: z.string().optional(),
   }),
   timeBudgetMinutes: z.number().int().positive().optional(),
   notes: z.string().optional(),
-  status: z
-    .object({
-      phase: z.string().min(1),
-      note: z.string().optional(),
-      milestones: z
-        .array(
-          z.object({
-            title: z.string().min(1),
-            done: z.boolean(),
-          }),
-        )
-        .optional(),
-    })
-    .optional(),
 });
 
 const taskSchema = z.object({
@@ -57,21 +45,13 @@ const fallbackTasks = [
 const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
   const focusNotes = payload.constraints.focusNotes?.trim();
   const budget = payload.timeBudgetMinutes ?? payload.constraints.timeBudgetMinutes;
-  const milestones = payload.status?.milestones ?? [];
-  const totalMilestones = milestones.length;
-  const doneMilestones = milestones.filter((milestone) => milestone.done).length;
-  const pendingMilestones = milestones
-    .filter((milestone) => !milestone.done)
-    .map((milestone) => milestone.title);
+  const milestoneContext = payload.milestoneTitle ? `\nTarget Milestone: ${payload.milestoneTitle}` : '';
   return `
-Goal: ${payload.goal}
+Project: ${payload.projectName || 'Unspecified'}
+Goal: ${payload.goal}${milestoneContext}
 Time budget (minutes): ${budget ?? "unspecified"}
 Focus notes: ${focusNotes || "none"}
 User notes: ${payload.notes?.trim() || "none"}
-Project phase: ${payload.status?.phase ?? "unknown"}
-Project status: ${payload.status?.note?.trim() || "none"}
-Milestones: ${doneMilestones}/${totalMilestones} complete
-Pending milestones: ${pendingMilestones.length > 0 ? pendingMilestones.join("; ") : "none"}
 
 Create a concise list of tasks with realistic time estimates. Keep tasks actionable and ordered.`;
 };
@@ -188,27 +168,27 @@ export async function POST(request: Request) {
 
   try {
     const response = await fetch(requestUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": apiKey,
-        },
-        body: JSON.stringify({
-          instructions:
-            "You are an expert project planner. Return only the JSON that matches the provided schema.",
-          input: buildPrompt(parsed.data),
-          model: deployment,
-          temperature: 0.2,
-          text: {
-            format: {
-              type: "json_schema",
-              name: schema.name,
-              strict: schema.strict,
-              schema: schema.schema,
-            },
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        instructions:
+          "You are an expert project planner. Return only the JSON that matches the provided schema.",
+        input: buildPrompt(parsed.data),
+        model: deployment,
+        temperature: 0.2,
+        text: {
+          format: {
+            type: "json_schema",
+            name: schema.name,
+            strict: schema.strict,
+            schema: schema.schema,
           },
-        }),
-      });
+        },
+      }),
+    });
 
     if (!response.ok) {
       return NextResponse.json({ tasks: fallbackTasks });

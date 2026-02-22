@@ -4,11 +4,12 @@ import type {
   AppView,
   DailyPlan,
   Project,
-  ProjectMilestone,
-  ProjectPhase,
-  ProjectStatus,
   Task,
   TaskStatus,
+  Milestone,
+  Activity,
+  BrainstormMessage,
+  BrainstormDraft,
 } from "./types";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -18,6 +19,9 @@ const defaultState: AppState = {
   tasks: [],
   dailyPlans: [],
   progressEntries: [],
+  milestones: [],
+  activities: [],
+  brainstormMessages: [],
   ui: {
     selectedDate: todayIso(),
     activeView: "projects",
@@ -30,18 +34,7 @@ type StoreActions = {
   setDate: (date: string) => void;
   setSelectedProject: (projectId?: string) => void;
   upsertProject: (project: Project) => void;
-  createProject: (data: Omit<Project, "id" | "createdAt" | "updatedAt" | "status">) => Project;
-  updateProjectStatus: (
-    projectId: string,
-    updates: Partial<Pick<ProjectStatus, "phase" | "note">>,
-  ) => void;
-  addProjectMilestone: (projectId: string, title: string) => void;
-  updateProjectMilestone: (
-    projectId: string,
-    milestoneId: string,
-    updates: Partial<Pick<ProjectMilestone, "title" | "done">>,
-  ) => void;
-  removeProjectMilestone: (projectId: string, milestoneId: string) => void;
+  createProject: (data: Omit<Project, "id" | "createdAt" | "updatedAt">) => Project;
   addTasks: (tasks: Task[]) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   updateTaskEstimate: (taskId: string, estimateMinutes: number) => void;
@@ -50,37 +43,22 @@ type StoreActions = {
   attachTasksToPlan: (date: string, projectId: string, taskIds: string[]) => void;
   setLastTranscript: (value?: string) => void;
   setLastVoicePrompt: (value?: string) => void;
+  createMilestone: (projectId: string, title: string) => void;
+  updateMilestoneStatus: (id: string, status: "active" | "completed") => void;
+  updateMilestone: (id: string, title: string) => void;
+  deleteMilestone: (id: string) => void;
+  moveMilestone: (id: string, direction: "up" | "down") => void;
+  updateProject: (projectId: string, data: Partial<Omit<Project, "id" | "createdAt" | "updatedAt">>) => void;
+  addActivity: (projectId: string, description: string) => void;
+  addBrainstormMessage: (role: "user" | "assistant", content: string, options?: string[]) => void;
+  updateActiveDraft: (draft: Partial<BrainstormDraft>) => void;
+  clearBrainstorm: () => void;
+  promoteDraftToProject: () => void;
 };
 
-const defaultProjectStatus = (fallbackTimestamp?: string): ProjectStatus => ({
-  phase: "planning",
-  note: "",
-  milestones: [],
-  updatedAt: fallbackTimestamp ?? new Date().toISOString(),
-});
-
-const normalizeState = (state: AppState): AppState => {
-  const projects = state.projects.map((project) => {
-    if (project.status) {
-      const normalizedStatus: ProjectStatus = {
-        phase: project.status.phase || "planning",
-        note: project.status.note || "",
-        milestones: project.status.milestones || [],
-        updatedAt: project.status.updatedAt || project.updatedAt || new Date().toISOString(),
-      };
-      return { ...project, status: normalizedStatus };
-    }
-    return {
-      ...project,
-      status: defaultProjectStatus(project.updatedAt),
-    };
-  });
-  return { ...state, projects };
-};
-
-export const useAppStore = create<AppState & StoreActions>((set) => ({
+export const useAppStore = create<AppState & StoreActions>((set, get) => ({
   ...defaultState,
-  hydrate: (state) => set(() => normalizeState(state)),
+  hydrate: (state) => set(() => state),
   setView: (view) => set((state) => ({ ui: { ...state.ui, activeView: view } })),
   setDate: (date) =>
     set((state) => ({ ui: { ...state.ui, selectedDate: date } })),
@@ -93,7 +71,6 @@ export const useAppStore = create<AppState & StoreActions>((set) => ({
     const project: Project = {
       ...data,
       id: crypto.randomUUID(),
-      status: defaultProjectStatus(now),
       createdAt: now,
       updatedAt: now,
     };
@@ -113,93 +90,12 @@ export const useAppStore = create<AppState & StoreActions>((set) => ({
       next[index] = project;
       return { projects: next };
     }),
-  updateProjectStatus: (projectId, updates) =>
+  updateProject: (projectId, data) =>
     set((state) => {
-      const now = new Date().toISOString();
-      const nextProjects = state.projects.map((project) => {
-        if (project.id !== projectId) return project;
-        const status = project.status ?? defaultProjectStatus(project.updatedAt);
-        return {
-          ...project,
-          status: {
-            ...status,
-            ...updates,
-            note: typeof updates.note === "string" ? updates.note : status.note,
-            updatedAt: now,
-          },
-          updatedAt: now,
-        };
-      });
-      return { projects: nextProjects };
-    }),
-  addProjectMilestone: (projectId, title) =>
-    set((state) => {
-      const now = new Date().toISOString();
-      const nextProjects = state.projects.map((project) => {
-        if (project.id !== projectId) return project;
-        const status = project.status ?? defaultProjectStatus(project.updatedAt);
-        const milestone: ProjectMilestone = {
-          id: crypto.randomUUID(),
-          title,
-          done: false,
-        };
-        return {
-          ...project,
-          status: {
-            ...status,
-            milestones: [...status.milestones, milestone],
-            updatedAt: now,
-          },
-          updatedAt: now,
-        };
-      });
-      return { projects: nextProjects };
-    }),
-  updateProjectMilestone: (projectId, milestoneId, updates) =>
-    set((state) => {
-      const now = new Date().toISOString();
-      const nextProjects = state.projects.map((project) => {
-        if (project.id !== projectId) return project;
-        const status = project.status ?? defaultProjectStatus(project.updatedAt);
-        const milestones = status.milestones.map((milestone) => {
-          if (milestone.id !== milestoneId) return milestone;
-          const nextDone = updates.done ?? milestone.done;
-          return {
-            ...milestone,
-            ...updates,
-            done: nextDone,
-            completedAt: nextDone ? milestone.completedAt ?? now : undefined,
-          };
-        });
-        return {
-          ...project,
-          status: {
-            ...status,
-            milestones,
-            updatedAt: now,
-          },
-          updatedAt: now,
-        };
-      });
-      return { projects: nextProjects };
-    }),
-  removeProjectMilestone: (projectId, milestoneId) =>
-    set((state) => {
-      const now = new Date().toISOString();
-      const nextProjects = state.projects.map((project) => {
-        if (project.id !== projectId) return project;
-        const status = project.status ?? defaultProjectStatus(project.updatedAt);
-        return {
-          ...project,
-          status: {
-            ...status,
-            milestones: status.milestones.filter((milestone) => milestone.id !== milestoneId),
-            updatedAt: now,
-          },
-          updatedAt: now,
-        };
-      });
-      return { projects: nextProjects };
+      const next = state.projects.map((p) =>
+        p.id === projectId ? { ...p, ...data, updatedAt: new Date().toISOString() } : p,
+      );
+      return { projects: next };
     }),
   addTasks: (tasks) =>
     set((state) => ({
@@ -218,18 +114,29 @@ export const useAppStore = create<AppState & StoreActions>((set) => ({
       const date = state.ui.selectedDate;
       const progressEntry = task
         ? {
-            id: crypto.randomUUID(),
-            date,
-            projectId: task.projectId,
-            taskId,
-            status,
-          }
+          id: crypto.randomUUID(),
+          date,
+          projectId: task.projectId,
+          taskId,
+          status,
+        }
         : undefined;
+
+      const activity = task
+        ? {
+          id: crypto.randomUUID(),
+          projectId: task.projectId,
+          description: `Moved task "${task.title}" to ${status}.`,
+          timestamp: new Date().toISOString(),
+        }
+        : undefined;
+
       return {
         tasks,
         progressEntries: progressEntry
           ? [...state.progressEntries, progressEntry]
           : state.progressEntries,
+        activities: activity ? [activity, ...state.activities] : state.activities,
       };
     }),
   updateTaskEstimate: (taskId, estimateMinutes) =>
@@ -277,6 +184,111 @@ export const useAppStore = create<AppState & StoreActions>((set) => ({
     set((state) => ({ ui: { ...state.ui, lastTranscript: value } })),
   setLastVoicePrompt: (value) =>
     set((state) => ({ ui: { ...state.ui, lastVoicePrompt: value } })),
+  createMilestone: (projectId, title) =>
+    set((state) => {
+      const milestone: Milestone = {
+        id: crypto.randomUUID(),
+        projectId,
+        title,
+        status: "active",
+        createdAt: new Date().toISOString(),
+      };
+      return { milestones: [...state.milestones, milestone] };
+    }),
+  updateMilestoneStatus: (id, status) =>
+    set((state) => {
+      const next = state.milestones.map((m) =>
+        m.id === id ? { ...m, status } : m,
+      );
+      return { milestones: next };
+    }),
+  updateMilestone: (id, title) =>
+    set((state) => {
+      const next = state.milestones.map((m) =>
+        m.id === id ? { ...m, title } : m,
+      );
+      return { milestones: next };
+    }),
+  deleteMilestone: (id) =>
+    set((state) => ({
+      milestones: state.milestones.filter((m) => m.id !== id),
+    })),
+  moveMilestone: (id, direction) =>
+    set((state) => {
+      const milestoneIndex = state.milestones.findIndex((m) => m.id === id);
+      if (milestoneIndex === -1) return state;
+
+      const milestone = state.milestones[milestoneIndex];
+      const projectMilestones = state.milestones.filter(m => m.projectId === milestone.projectId);
+      const indexInProject = projectMilestones.findIndex(m => m.id === id);
+
+      if (direction === "up" && indexInProject > 0) {
+        const targetId = projectMilestones[indexInProject - 1].id;
+        const stateTargetIndex = state.milestones.findIndex(m => m.id === targetId);
+        const next = [...state.milestones];
+        [next[milestoneIndex], next[stateTargetIndex]] = [next[stateTargetIndex], next[milestoneIndex]];
+        return { milestones: next };
+      }
+
+      if (direction === "down" && indexInProject < projectMilestones.length - 1) {
+        const targetId = projectMilestones[indexInProject + 1].id;
+        const stateTargetIndex = state.milestones.findIndex(m => m.id === targetId);
+        const next = [...state.milestones];
+        [next[milestoneIndex], next[stateTargetIndex]] = [next[stateTargetIndex], next[milestoneIndex]];
+        return { milestones: next };
+      }
+
+      return state;
+    }),
+  addActivity: (projectId, description) =>
+    set((state) => {
+      const activity: Activity = {
+        id: crypto.randomUUID(),
+        projectId,
+        description,
+        timestamp: new Date().toISOString(),
+      };
+      return { activities: [activity, ...state.activities] };
+    }),
+  addBrainstormMessage: (role, content, options) =>
+    set((state) => ({
+      brainstormMessages: [
+        ...state.brainstormMessages,
+        { id: crypto.randomUUID(), role, content, options, timestamp: new Date().toISOString() },
+      ],
+    })),
+  updateActiveDraft: (draft) =>
+    set((state) => ({
+      activeDraft: {
+        ...(state.activeDraft || { name: "", goal: "", milestones: [], constraints: [], isReady: false }),
+        ...draft,
+      },
+    })),
+  clearBrainstorm: () =>
+    set(() => ({
+      brainstormMessages: [],
+      activeDraft: undefined,
+    })),
+  promoteDraftToProject: () => {
+    const { activeDraft, createProject, createMilestone, setView, clearBrainstorm } = get();
+    if (!activeDraft) return;
+
+    const project = createProject({
+      name: activeDraft.name || "Untitled Project",
+      goal: activeDraft.goal || "Brainstormed Goal",
+      constraints: {
+        timeBudgetMinutes: 60,
+        focusNotes: activeDraft.constraints.join("\n"),
+      },
+    });
+
+    activeDraft.milestones.forEach((m) => {
+      createMilestone(project.id, m);
+    });
+
+    clearBrainstorm();
+    setView("plan");
+  },
 }));
 
 export const getInitialState = (): AppState => defaultState;

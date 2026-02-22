@@ -1,28 +1,6 @@
 export type TaskStatus = "todo" | "doing" | "done";
 export type TaskSource = "manual" | "ai";
 
-export type ProjectPhase =
-  | "discovery"
-  | "planning"
-  | "build"
-  | "QA"
-  | "launch"
-  | "maintenance";
-
-export type ProjectMilestone = {
-  id: string;
-  title: string;
-  done: boolean;
-  completedAt?: string;
-};
-
-export type ProjectStatus = {
-  phase: ProjectPhase;
-  note?: string;
-  milestones: ProjectMilestone[];
-  updatedAt: string;
-};
-
 export type ProjectConstraints = {
   timeBudgetMinutes: number;
   focusNotes?: string;
@@ -33,7 +11,6 @@ export type Project = {
   name: string;
   goal: string;
   constraints: ProjectConstraints;
-  status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
 };
@@ -68,13 +45,48 @@ export type ProgressEntry = {
   durationMinutes?: number;
 };
 
-export type AppView = "projects" | "plan" | "focus" | "history";
+export type Milestone = {
+  id: string;
+  projectId: string;
+  title: string;
+  status: "active" | "completed";
+  createdAt: string;
+};
+
+export type Activity = {
+  id: string;
+  projectId: string;
+  timestamp: string;
+  description: string;
+};
+
+export type BrainstormMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  options?: string[];
+  timestamp: string;
+};
+
+export type BrainstormDraft = {
+  name: string;
+  goal: string;
+  milestones: string[];
+  constraints: string[];
+  isReady: boolean;
+};
+
+export type AppView = "projects" | "plan" | "focus" | "history" | "brainstorm";
 
 export type AppState = {
   projects: Project[];
   tasks: Task[];
   dailyPlans: DailyPlan[];
   progressEntries: ProgressEntry[];
+  milestones: Milestone[];
+  activities: Activity[];
+  brainstormMessages: BrainstormMessage[];
+  activeDraft?: BrainstormDraft;
   ui: {
     selectedProjectId?: string;
     selectedDate: string;
