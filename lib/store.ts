@@ -38,6 +38,10 @@ type StoreActions = {
   addTasks: (tasks: Task[]) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   updateTaskEstimate: (taskId: string, estimateMinutes: number) => void;
+  toggleTaskPinned: (taskId: string) => void;
+  removeTasks: (taskIds: string[]) => void;
+  detachTasksFromPlan: (date: string, projectId: string, taskIds: string[]) => void;
+  removeProgressEntriesForTasks: (taskIds: string[]) => void;
   setFocusTask: (taskId?: string) => void;
   upsertDailyPlan: (plan: DailyPlan) => void;
   attachTasksToPlan: (date: string, projectId: string, taskIds: string[]) => void;
@@ -144,6 +148,30 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
       tasks: state.tasks.map((task) =>
         task.id === taskId ? { ...task, estimateMinutes } : task,
       ),
+    })),
+  toggleTaskPinned: (taskId) =>
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId ? { ...task, pinned: !task.pinned } : task,
+      ),
+    })),
+  removeTasks: (taskIds) =>
+    set((state) => ({
+      tasks: state.tasks.filter((task) => !taskIds.includes(task.id)),
+    })),
+  detachTasksFromPlan: (date, projectId, taskIds) =>
+    set((state) => ({
+      dailyPlans: state.dailyPlans.map((plan) => {
+        if (plan.date !== date || plan.projectId !== projectId) return plan;
+        return {
+          ...plan,
+          taskIds: plan.taskIds.filter((id) => !taskIds.includes(id)),
+        };
+      }),
+    })),
+  removeProgressEntriesForTasks: (taskIds) =>
+    set((state) => ({
+      progressEntries: state.progressEntries.filter((entry) => !taskIds.includes(entry.taskId)),
     })),
   setFocusTask: (taskId) =>
     set((state) => ({ ui: { ...state.ui, focusTaskId: taskId } })),

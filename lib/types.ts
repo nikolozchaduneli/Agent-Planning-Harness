@@ -18,6 +18,7 @@ export type Project = {
 export type Task = {
   id: string;
   projectId: string;
+  milestoneId?: string;
   title: string;
   description?: string;
   estimateMinutes: number;
@@ -25,6 +26,8 @@ export type Task = {
   createdAt: string;
   completedAt?: string;
   source: TaskSource;
+  aiBatchId?: string;
+  pinned?: boolean;
 };
 
 export type DailyPlan = {

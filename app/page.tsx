@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { loadState, saveState } from "@/lib/storage";
 import { getInitialState, useAppStore } from "@/lib/store";
 import type { AppState, DailyPlan, Task } from "@/lib/types";
@@ -51,6 +51,10 @@ export default function Home() {
     attachTasksToPlan,
     updateTaskStatus,
     updateTaskEstimate,
+    toggleTaskPinned,
+    removeTasks,
+    detachTasksFromPlan,
+    removeProgressEntriesForTasks,
     setFocusTask,
     setLastTranscript,
     setLastVoicePrompt,
@@ -86,6 +90,13 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingMilestones, setIsGeneratingMilestones] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiPrompt, setAiPrompt] = useState<{
+    pinnedCount: number;
+    unpinnedCount: number;
+    remainingAppend: number;
+    remainingReplace: number;
+    removeTaskIds: string[];
+  } | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [activeRecordingField, setActiveRecordingField] = useState<string | null>(null);
   const activeRecordingCallback = useRef<((transcript: string) => void) | null>(null);
@@ -95,6 +106,7 @@ export default function Home() {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [showBudgetOverride, setShowBudgetOverride] = useState(false);
   const [budgetOverrideDraft, setBudgetOverrideDraft] = useState("");
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -121,6 +133,30 @@ export default function Home() {
     ? projectMilestones.find((m) => m.id === selectedMilestoneId)
     : undefined;
   const hasBudgetOverride = typeof activePlan?.timeBudgetOverrideMinutes === "number";
+  const milestoneTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    projectMilestones.forEach((m) => map.set(m.id, m.title));
+    return map;
+  }, [projectMilestones]);
+  const aiBatchMeta = useMemo(() => {
+    const map = new Map<string, { label: string; createdAt: string }>();
+    planTasks.forEach((task) => {
+      if (task.source !== "ai") return;
+      const batchKey = task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`;
+      if (map.has(batchKey)) return;
+      const label = task.milestoneId
+        ? milestoneTitleById.get(task.milestoneId) || "Milestone"
+        : "Whole Project";
+      map.set(batchKey, { label, createdAt: task.createdAt });
+    });
+    return map;
+  }, [planTasks, milestoneTitleById]);
+  const scopedActivities = useMemo(() => {
+    if (!selectedProject) return [];
+    const projectActivities = activities.filter((a) => a.projectId === selectedProject.id);
+    if (showAllActivity) return projectActivities;
+    return projectActivities.filter((a) => a.timestamp.slice(0, 10) === selectedDate);
+  }, [activities, selectedProject, selectedDate, showAllActivity]);
 
 useEffect(() => {
   const init = async () => {
@@ -261,11 +297,36 @@ const handleAddManualTask = () => {
   setManualTitle("");
 };
 
-  const handleGenerateTasks = async (skipMilestonePrompt?: boolean) => {
+const handleAddMilestone = () => {
+  if (!selectedProject || !newMilestoneTitle.trim()) return;
+  createMilestone(selectedProject.id, newMilestoneTitle.trim());
+  addActivity(selectedProject.id, `Created milestone: ${newMilestoneTitle.trim()}`);
+  setNewMilestoneTitle("");
+};
+
+const buildAiScope = () => {
+  const scopeMilestoneId = selectedMilestone?.id;
+  const scopeTasks = planTasks.filter(
+    (task) =>
+      task.source === "ai" &&
+      (scopeMilestoneId ? task.milestoneId === scopeMilestoneId : !task.milestoneId),
+  );
+  return { scopeMilestoneId, scopeTasks };
+};
+
+const computeRemainingBudget = (removedEstimate: number) =>
+  Math.max(0, (budget || 0) - (totalPlanned - removedEstimate));
+
+const runAiGeneration = async (remainingBudget: number, removeTaskIds: string[]) => {
   if (!selectedProject) return;
-  if (!skipMilestonePrompt && projectMilestones.length === 0) {
-    setShowMilestonePrompt(true);
+  if (remainingBudget <= 0) {
+    setAiError("Pinned tasks already fill today's budget.");
     return;
+  }
+  if (removeTaskIds.length > 0) {
+    removeTasks(removeTaskIds);
+    detachTasksFromPlan(selectedDate, selectedProject.id, removeTaskIds);
+    removeProgressEntriesForTasks(removeTaskIds);
   }
   setIsGenerating(true);
   setAiError(null);
@@ -279,8 +340,12 @@ const handleAddManualTask = () => {
         goal: selectedProject.goal,
         projectName: selectedProject.name,
         milestoneTitle: selectedMilestone ? selectedMilestone.title : undefined,
+        milestones: projectMilestones.map((milestone) => ({
+          title: milestone.title,
+          status: milestone.status,
+        })),
         constraints: selectedProject.constraints,
-        timeBudgetMinutes: budget || selectedProject.constraints.timeBudgetMinutes,
+        timeBudgetMinutes: remainingBudget,
         notes: planNotes.trim() || undefined,
       }),
     });
@@ -289,15 +354,19 @@ const handleAddManualTask = () => {
       throw new Error("AI response invalid");
     }
     const now = new Date().toISOString();
+    const batchId = crypto.randomUUID();
     const newTasks: Task[] = (data.tasks as AiTask[]).map((task) => ({
       id: crypto.randomUUID(),
       projectId: selectedProject.id,
+      milestoneId: selectedMilestone?.id,
       title: task.title,
       description: task.description,
       estimateMinutes: task.estimateMinutes,
       status: "todo",
       createdAt: now,
       source: "ai",
+      aiBatchId: batchId,
+      pinned: false,
     }));
     addTasks(newTasks);
     attachTasksToPlan(
@@ -310,6 +379,34 @@ const handleAddManualTask = () => {
   } finally {
     setIsGenerating(false);
   }
+};
+
+const handleGenerateTasks = async (skipMilestonePrompt?: boolean) => {
+  if (!selectedProject) return;
+  if (!skipMilestonePrompt && projectMilestones.length === 0) {
+    setShowMilestonePrompt(true);
+    return;
+  }
+
+  const { scopeTasks } = buildAiScope();
+  const pinnedTasks = scopeTasks.filter((task) => task.pinned);
+  const unpinnedTasks = scopeTasks.filter((task) => !task.pinned);
+  const removedEstimate = unpinnedTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
+  const remainingReplace = computeRemainingBudget(removedEstimate);
+  const remainingAppend = computeRemainingBudget(0);
+
+  if (scopeTasks.length === 0) {
+    await runAiGeneration(remainingAppend, []);
+    return;
+  }
+
+  setAiPrompt({
+    pinnedCount: pinnedTasks.length,
+    unpinnedCount: unpinnedTasks.length,
+    remainingAppend,
+    remainingReplace,
+    removeTaskIds: unpinnedTasks.map((task) => task.id),
+  });
 };
 
 const handleProposeMilestones = async () => {
@@ -365,9 +462,7 @@ const clearPlanBudgetOverride = () => {
   upsertDailyPlan({ ...activePlan, timeBudgetOverrideMinutes: undefined });
 };
 
-const focusTask =
-  tasks.find((task) => task.id === ui.focusTaskId) ||
-  planTasks.find((task) => task.status !== "done");
+const focusTask = tasks.find((task) => task.id === ui.focusTaskId);
 
 const projectHistory = useMemo(() => {
   const lookbackDays = 10;
@@ -640,33 +735,41 @@ return (
                     </div>
                   ))}
                 </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="relative flex-1 flex items-center">
-                    <input
-                      type="text"
-                      placeholder="New milestone..."
-                      ref={newMilestoneInputRef}
-                      value={newMilestoneTitle}
-                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newMilestoneTitle.trim()) {
-                          createMilestone(selectedProject.id, newMilestoneTitle.trim());
-                          addActivity(selectedProject.id, `Created milestone: ${newMilestoneTitle.trim()}`);
-                          setNewMilestoneTitle("");
-                        }
-                      }}
-                      className="w-full rounded-lg border-transparent bg-white px-3 py-2 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                    />
-                    <div className="absolute right-1">
-                      <DictationMic
-                        isRecording={activeRecordingField === "newMilestone"}
-                        onClick={() => {
-                          if (activeRecordingField === "newMilestone") stopRecording();
-                          else startRecording("newMilestone", (text) => setNewMilestoneTitle(text), "Context: I am adding a new milestone to the project.");
+                <div className="mt-1 grid gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 flex items-center">
+                      <input
+                        type="text"
+                        placeholder="New milestone..."
+                        ref={newMilestoneInputRef}
+                        value={newMilestoneTitle}
+                        onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddMilestone();
                         }}
+                        className="w-full rounded-lg border-transparent bg-white px-3 py-2 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                       />
+                      <div className="absolute right-1">
+                        <DictationMic
+                          isRecording={activeRecordingField === "newMilestone"}
+                          onClick={() => {
+                            if (activeRecordingField === "newMilestone") stopRecording();
+                            else startRecording("newMilestone", (text) => setNewMilestoneTitle(text), "Context: I am adding a new milestone to the project.");
+                          }}
+                        />
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleAddMilestone}
+                      className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+                    >
+                      Add
+                    </button>
                   </div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Press Enter to add
+                  </p>
                 </div>
               </div>
             </>
@@ -1437,6 +1540,53 @@ return (
                           </div>
                         </div>
                       )}
+                      {aiPrompt && (
+                        <div className="rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/90 p-4 text-xs text-[var(--ink)]">
+                          <p className="text-[var(--ink)] font-semibold">Regenerate AI tasks?</p>
+                          <p className="mt-1 text-[var(--muted)]">
+                            Keep {aiPrompt.pinnedCount} pinned task{aiPrompt.pinnedCount === 1 ? "" : "s"} and replace {aiPrompt.unpinnedCount} unpinned.
+                          </p>
+                          <p className="mt-2 text-[var(--muted)]">
+                            Remaining budget: {aiPrompt.remainingReplace}m (replace) / {aiPrompt.remainingAppend}m (append)
+                          </p>
+                          {aiPrompt.remainingReplace <= 0 && (
+                            <p className="mt-2 text-red-600">Pinned tasks already fill today&apos;s budget.</p>
+                          )}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={aiPrompt.unpinnedCount === 0 || aiPrompt.remainingReplace <= 0}
+                              onClick={() => {
+                                const next = aiPrompt;
+                                setAiPrompt(null);
+                                runAiGeneration(next.remainingReplace, next.removeTaskIds);
+                              }}
+                              className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
+                            >
+                              Regenerate unpinned
+                            </button>
+                            <button
+                              type="button"
+                              disabled={aiPrompt.remainingAppend <= 0}
+                              onClick={() => {
+                                const next = aiPrompt;
+                                setAiPrompt(null);
+                                runAiGeneration(next.remainingAppend, []);
+                              }}
+                              className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:-translate-y-0.5 disabled:opacity-50"
+                            >
+                              Append new batch
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAiPrompt(null)}
+                              className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] transition hover:-translate-y-0.5"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {aiError && <p className="text-xs text-red-600">{aiError}</p>}
                     </div>
                     <div className="flex flex-col gap-2">
@@ -1508,67 +1658,95 @@ return (
                     {planTasks.length === 0 && (
                       <p className="text-sm text-[var(--muted)]">No tasks yet for this day.</p>
                     )}
-                    {planTasks.map((task) => {
-                      const isLong = task.title.length > 80;
-                      return (
-                        <div
-                          key={task.id}
-                          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(15,23,42,0.12)] bg-white/90 p-4 shadow-sm"
-                        >
-                          <div className="min-w-[220px] flex-1">
-                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                              {task.source === "ai" ? "AI task" : "Manual task"}
-                            </p>
-                            <h4
-                              className={`text-lg ${isLong ? "line-clamp-2 cursor-pointer hover:opacity-80" : ""}`}
-                              onClick={(e) => {
-                                if (isLong) {
-                                  const el = e.currentTarget;
-                                  el.classList.toggle("line-clamp-2");
-                                }
-                              }}
-                              title={isLong ? "Click to expand" : undefined}
-                            >{task.title}</h4>
-                            {task.description && (
-                              <p className="text-sm text-[var(--muted)]">{task.description}</p>
+                    {(() => {
+                      const seenBatches = new Set<string>();
+                      return planTasks.map((task) => {
+                        const isLong = task.title.length > 80;
+                        const batchKey =
+                          task.source === "ai"
+                            ? task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`
+                            : null;
+                        const showBatchHeader = batchKey ? !seenBatches.has(batchKey) : false;
+                        if (showBatchHeader && batchKey) seenBatches.add(batchKey);
+                        const batchMeta = batchKey ? aiBatchMeta.get(batchKey) : undefined;
+
+                        return (
+                          <Fragment key={task.id}>
+                            {showBatchHeader && batchMeta && (
+                              <div className="rounded-full bg-[var(--panel)] px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                                AI tasks — {batchMeta.label} · {new Date(batchMeta.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </div>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min={5}
-                              max={240}
-                              value={task.estimateMinutes || ""}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(event) =>
-                                updateTaskEstimate(task.id, event.target.value === "" ? 0 : Number(event.target.value))
-                              }
-                              className="w-20 rounded-xl border border-transparent bg-[var(--panel)] px-2 py-1 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                            />
-                            <button
-                              onClick={() => {
-                                setFocusTask(task.id);
-                                setView("focus");
-                              }}
-                              className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-xs uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+                            <div
+                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(15,23,42,0.2)] bg-white p-4 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.5)]"
                             >
-                              Focus
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")
-                              }
-                              className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] shadow transition ${task.status === "done"
-                                ? "bg-emerald-500 text-white"
-                                : "border border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
-                                }`}
-                            >
-                              {task.status === "done" ? "Done" : "Mark done"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              <div className="min-w-[220px] flex-1">
+                                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                                  {task.source === "ai" ? "AI task" : "Manual task"}
+                                </p>
+                                <h4
+                                  className={`text-lg font-semibold ${isLong ? "line-clamp-2 cursor-pointer hover:opacity-80" : ""}`}
+                                  onClick={(e) => {
+                                    if (isLong) {
+                                      const el = e.currentTarget;
+                                      el.classList.toggle("line-clamp-2");
+                                    }
+                                  }}
+                                  title={isLong ? "Click to expand" : undefined}
+                                >{task.title}</h4>
+                                {task.description && (
+                                  <p className="text-sm text-[var(--muted)]">{task.description}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={5}
+                                  max={240}
+                                  value={task.estimateMinutes || ""}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(event) =>
+                                    updateTaskEstimate(task.id, event.target.value === "" ? 0 : Number(event.target.value))
+                                  }
+                                  className="w-20 rounded-xl border border-transparent bg-[var(--panel)] px-2 py-1 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                                />
+                                {task.source === "ai" && (
+                                  <button
+                                    onClick={() => toggleTaskPinned(task.id)}
+                                    className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] shadow transition hover:-translate-y-0.5 ${task.pinned
+                                      ? "border-[var(--accent)] bg-[rgba(249,115,22,0.12)] text-[var(--accent)]"
+                                      : "border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
+                                      }`}
+                                  >
+                                    {task.pinned ? "Pinned" : "Pin"}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setFocusTask(task.id);
+                                    setView("focus");
+                                  }}
+                                  className="rounded-full border border-[rgba(15,23,42,0.12)] bg-white px-3 py-2 text-xs uppercase tracking-[0.2em] text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+                                >
+                                  Focus
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")
+                                  }
+                                  className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] shadow transition ${task.status === "done"
+                                    ? "bg-emerald-500 text-white"
+                                    : "border border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)]"
+                                    }`}
+                                >
+                                  {task.status === "done" ? "Done" : "Mark done"}
+                                </button>
+                              </div>
+                            </div>
+                          </Fragment>
+                        );
+                      });
+                    })()}
                   </div>
                 </>
               )}
@@ -1716,15 +1894,35 @@ return (
     {/* RIGHT SIDEBAR: Activity Log */}
     {!isFirstRun && ui.activeView !== "brainstorm" && (
       <aside className="no-scrollbar flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-[rgba(15,23,42,0.08)] bg-white/60 p-6 shadow-sm transition-all duration-600 ease-out">
-        <h3 className="mb-6 text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
-          Activity Trail
-        </h3>
+        <div className="mb-6 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+            Activity Trail
+          </h3>
+          {selectedProject && (
+            <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] shadow">
+              <button
+                onClick={() => setShowAllActivity(false)}
+                className={`rounded-full px-2 py-1 ${!showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setShowAllActivity(true)}
+                className={`rounded-full px-2 py-1 ${showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
+              >
+                All
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex flex-col gap-4">
           {!selectedProject && <p className="text-sm text-[var(--muted)] italic">Select a project.</p>}
-          {selectedProject && activities.filter((a) => a.projectId === selectedProject.id).length === 0 && (
-            <p className="text-sm text-[var(--muted)]">No activity logged yet.</p>
+          {selectedProject && scopedActivities.length === 0 && (
+            <p className="text-sm text-[var(--muted)]">
+              {showAllActivity ? "No activity logged yet." : `No activity for ${selectedDate}.`}
+            </p>
           )}
-          {selectedProject && activities.filter((a) => a.projectId === selectedProject.id).map((activity) => (
+          {selectedProject && scopedActivities.map((activity) => (
             <div key={activity.id} className="flex gap-3 text-sm">
               <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]" />
               <div>

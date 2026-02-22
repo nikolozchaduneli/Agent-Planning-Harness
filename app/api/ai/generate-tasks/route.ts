@@ -6,6 +6,14 @@ const requestSchema = z.object({
   goal: z.string().min(1),
   projectName: z.string().optional(),
   milestoneTitle: z.string().optional(),
+  milestones: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        status: z.enum(["active", "completed"]).optional(),
+      }),
+    )
+    .optional(),
   constraints: z.object({
     timeBudgetMinutes: z.number().int().positive().optional(),
     focusNotes: z.string().optional(),
@@ -45,15 +53,29 @@ const fallbackTasks = [
 const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
   const focusNotes = payload.constraints.focusNotes?.trim();
   const budget = payload.timeBudgetMinutes ?? payload.constraints.timeBudgetMinutes;
-  const milestoneContext = payload.milestoneTitle ? `\nTarget Milestone: ${payload.milestoneTitle}` : '';
+  const milestoneContext = payload.milestoneTitle ? `\nTarget Milestone: ${payload.milestoneTitle}` : "";
+  const milestoneList = payload.milestones?.map((m) => m.title.trim()).filter(Boolean) ?? [];
+  const otherMilestones = payload.milestoneTitle
+    ? milestoneList.filter((title) => title !== payload.milestoneTitle)
+    : milestoneList;
+  const milestonesContext =
+    milestoneList.length > 0
+      ? `\nAll milestones: ${milestoneList.join(" | ")}`
+      : "";
+  const otherMilestonesContext =
+    otherMilestones.length > 0
+      ? `\nOther milestones (avoid overlap): ${otherMilestones.join(" | ")}`
+      : "";
   return `
 Project: ${payload.projectName || 'Unspecified'}
-Goal: ${payload.goal}${milestoneContext}
+Goal: ${payload.goal}${milestoneContext}${milestonesContext}${otherMilestonesContext}
 Time budget (minutes): ${budget ?? "unspecified"}
 Focus notes: ${focusNotes || "none"}
 User notes: ${payload.notes?.trim() || "none"}
 
-Create a concise list of tasks with realistic time estimates. Keep tasks actionable and ordered.`;
+Create a concise list of tasks with realistic time estimates. Keep tasks actionable and ordered.
+If a target milestone is provided, keep tasks tightly scoped to it and avoid tasks that belong to other milestones.
+If a time budget is provided, the SUM of estimateMinutes across all tasks must be <= that budget.`;
 };
 
 const extractJson = (content: string) => {
