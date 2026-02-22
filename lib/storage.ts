@@ -1,5 +1,5 @@
 import { openDB } from "idb";
-import type { AppState } from "./types";
+import type { AppState, DailyPlan } from "./types";
 
 const DB_NAME = "task-organizer";
 const DB_VERSION = 1;
@@ -16,6 +16,18 @@ const getDb = async () =>
     },
   });
 
+const normalizeState = (state: AppState): AppState => {
+  const migratedPlans = state.dailyPlans.map((plan) => {
+    const legacyPlan = plan as DailyPlan & { timeBudgetMinutes?: number };
+    if (typeof legacyPlan.timeBudgetMinutes === "number") {
+      const { timeBudgetMinutes, ...rest } = legacyPlan;
+      return { ...rest, timeBudgetOverrideMinutes: timeBudgetMinutes };
+    }
+    return plan;
+  });
+  return { ...state, dailyPlans: migratedPlans };
+};
+
 export const loadState = async (): Promise<AppState | null> => {
   if (typeof window === "undefined") {
     return null;
@@ -25,7 +37,7 @@ export const loadState = async (): Promise<AppState | null> => {
     const db = await getDb();
     const stored = await db.get(STORE_NAME, STATE_KEY);
     if (stored) {
-      return stored as AppState;
+      return normalizeState(stored as AppState);
     }
   } catch {
     // fall back to localStorage
@@ -36,7 +48,7 @@ export const loadState = async (): Promise<AppState | null> => {
     if (!raw) {
       return null;
     }
-    return JSON.parse(raw) as AppState;
+    return normalizeState(JSON.parse(raw) as AppState);
   } catch {
     return null;
   }

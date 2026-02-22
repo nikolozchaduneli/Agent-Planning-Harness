@@ -32,7 +32,7 @@ export type DailyPlan = {
   projectId: string;
   date: string;
   taskIds: string[];
-  timeBudgetMinutes: number;
+  timeBudgetOverrideMinutes?: number;
   createdAt: string;
 };
 

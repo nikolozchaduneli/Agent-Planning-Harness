@@ -168,7 +168,7 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
           date,
           projectId,
           taskIds,
-          timeBudgetMinutes: 0,
+          timeBudgetOverrideMinutes: undefined,
           createdAt: new Date().toISOString(),
         };
         return { dailyPlans: [...state.dailyPlans, plan] };
