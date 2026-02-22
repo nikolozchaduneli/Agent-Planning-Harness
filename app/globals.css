@@ -45,3 +45,15 @@ textarea,
 select {
   font-family: inherit;
 }
+
+button,
+a,
+select,
+summary,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer;
+}

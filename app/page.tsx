@@ -91,6 +91,7 @@ export default function Home() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [brainstormInput, setBrainstormInput] = useState("");
   const [isBrainstorming, setIsBrainstorming] = useState(false);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
@@ -129,6 +130,13 @@ export default function Home() {
       document.getElementById("anchor")?.scrollIntoView({ behavior: "smooth" });
     }
   }, [brainstormMessages, ui.activeView]);
+
+  useEffect(() => {
+    if (isFirstRun) return;
+    if (ui.activeView === "brainstorm") {
+      setIsLeftSidebarOpen(false);
+    }
+  }, [ui.activeView, isFirstRun]);
 
   useEffect(() => {
     const unsub = useAppStore.subscribe((state: AppState) => {
@@ -460,14 +468,47 @@ Prefer exact capitalization for product names and acronyms.`;
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-[15px]">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-[15px]">
       {/* LEFT SIDEBAR: Context & Milestones */}
-      {!isFirstRun && ui.activeView !== "brainstorm" && (
-        <aside className="no-scrollbar flex w-[320px] flex-shrink-0 flex-col gap-6 overflow-y-auto border-r border-[rgba(15,23,42,0.08)] bg-white/60 p-6 shadow-sm transition-all duration-500">
+      {!isFirstRun && (
+        <div
+          className={`relative flex-shrink-0 overflow-hidden transition-all duration-600 ease-out ${
+            isLeftSidebarOpen ? "w-[320px]" : "w-12"
+          }`}
+        >
+          <button
+            onClick={() => setIsLeftSidebarOpen((prev) => !prev)}
+            className="absolute right-2 top-6 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(15,23,42,0.12)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+            title={isLeftSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            aria-label={isLeftSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+            </svg>
+          </button>
+          <aside
+            className={`no-scrollbar flex h-full w-full flex-col gap-6 overflow-hidden bg-white/60 shadow-sm transition-all duration-600 ease-out ${
+              isLeftSidebarOpen
+                ? "translate-x-0 border-r border-[rgba(15,23,42,0.08)] p-6 opacity-100"
+                : "-translate-x-4 border-r-0 p-0 opacity-0 pointer-events-none"
+            }`}
+          >
           <div>
-            <h1 className="mb-4 text-xs font-bold uppercase tracking-[0.4em] text-[var(--muted)]">
-              Planner
-            </h1>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h1 className="text-xs font-bold uppercase tracking-[0.4em] text-[var(--muted)]">
+                Planner
+              </h1>
+            </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                 Active Project
@@ -528,7 +569,7 @@ Prefer exact capitalization for product names and acronyms.`;
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Milestones</h3>
                   <button
@@ -539,7 +580,7 @@ Prefer exact capitalization for product names and acronyms.`;
                     {isGeneratingMilestones ? "Thinking..." : "AI Propose"}
                   </button>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-6 -mr-6">
                   {milestones.filter((m) => m.projectId === selectedProject.id).map((m) => (
                     <div key={m.id} className={`flex items-start gap-2 rounded-lg border border-[rgba(15,23,42,0.05)] p-2.5 text-sm transition ${m.status === "completed" ? "bg-white/50 opacity-60" : "bg-white shadow-sm"}`}>
                       <input
@@ -584,7 +625,8 @@ Prefer exact capitalization for product names and acronyms.`;
           ) : (
             <div className="text-sm italic text-[var(--muted)]">Select a project to view context.</div>
           )}
-        </aside>
+          </aside>
+        </div>
       )}
 
       {/* CENTER PANE: Main Application */}
@@ -595,20 +637,23 @@ Prefer exact capitalization for product names and acronyms.`;
               Welcome to Task Centric Planner
             </div>
           ) : (
-            <nav className="flex gap-2">
-              {(["brainstorm", "plan", "focus", "history", "projects"] as const).map((view) => (
-                <button
-                  key={view}
-                  onClick={() => setView(view)}
-                  className={`rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5 ${ui.activeView === view
-                    ? "bg-[var(--accent)] text-white shadow shadow-[var(--accent)]/30"
-                    : "bg-transparent text-[var(--muted)] hover:bg-[rgba(15,23,42,0.04)] hover:text-[var(--ink)]"
+            <div className="flex flex-wrap items-center gap-3">
+              <nav className="flex gap-2">
+                {(["brainstorm", "plan", "focus", "history", "projects"] as const).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setView(view)}
+                    className={`rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5 ${
+                      ui.activeView === view
+                        ? "bg-[var(--accent)] text-white shadow shadow-[var(--accent)]/30"
+                        : "bg-transparent text-[var(--muted)] hover:bg-[rgba(15,23,42,0.04)] hover:text-[var(--ink)]"
                     }`}
-                >
-                  {view === "brainstorm" ? "drawing board" : view === "projects" ? "settings" : view}
-                </button>
-              ))}
-            </nav>
+                  >
+                    {view === "brainstorm" ? "drawing board" : view === "projects" ? "settings" : view}
+                  </button>
+                ))}
+              </nav>
+            </div>
           )}
 
           <div className="flex flex-wrap items-center gap-4">
@@ -653,6 +698,10 @@ Prefer exact capitalization for product names and acronyms.`;
         </header>
 
         <div className={`mx-auto w-full px-8 py-10 pb-20 ${ui.activeView === "brainstorm" ? "max-w-none" : "max-w-5xl"}`}>
+          <div
+            key={ui.activeView}
+            className="animate-in fade-in slide-in-from-bottom-1 duration-500 ease-out"
+          >
 
           {ui.activeView === "brainstorm" && (
             <section className="grid gap-8 md:grid-cols-[1fr_360px] h-[calc(100vh-180px)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1454,12 +1503,13 @@ Prefer exact capitalization for product names and acronyms.`;
               </div>
             </section>
           )}
+          </div>
         </div>
       </main>
 
       {/* RIGHT SIDEBAR: Activity Log */}
       {!isFirstRun && ui.activeView !== "brainstorm" && (
-        <aside className="no-scrollbar flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-[rgba(15,23,42,0.08)] bg-white/60 p-6 shadow-sm transition-all duration-500">
+        <aside className="no-scrollbar flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-[rgba(15,23,42,0.08)] bg-white/60 p-6 shadow-sm transition-all duration-600 ease-out">
           <h3 className="mb-6 text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
             Activity Trail
           </h3>
