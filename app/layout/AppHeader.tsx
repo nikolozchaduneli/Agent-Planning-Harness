@@ -7,14 +7,19 @@ import useVoiceRecording from "@/app/hooks/useVoiceRecording";
 
 const styles = {
   header:
-    "sticky top-0 z-10 flex flex-nowrap items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[#f8fafc]/90 px-8 py-4 backdrop-blur-md",
+    "sticky top-0 z-10 flex flex-nowrap items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[#f8fafc]/90 pl-8 pr-3 py-4 backdrop-blur-md",
   navButton:
     "rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5",
   dateInput:
     "rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
 };
 
-export default function AppHeader() {
+type AppHeaderProps = {
+  activitySidebarOpen: boolean;
+  onToggleActivity: () => void;
+};
+
+export default function AppHeader({ activitySidebarOpen, onToggleActivity }: AppHeaderProps) {
   const { ui, projects, setView, setDate } = useAppStore(
     useShallow((state) => ({
       ui: state.ui,
@@ -81,11 +86,10 @@ export default function AppHeader() {
               <button
                 key={view}
                 onClick={() => setView(view)}
-                className={`${styles.navButton} ${
-                  ui.activeView === view
+                className={`${styles.navButton} ${ui.activeView === view
                     ? "bg-[var(--accent)] text-white shadow shadow-[var(--accent)]/30"
                     : "bg-transparent text-[var(--muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
-                }`}
+                  }`}
               >
                 {view === "brainstorm"
                   ? "drawing board"
@@ -118,11 +122,10 @@ export default function AppHeader() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleVoiceCapture}
-                className={`relative flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] shadow-sm transition hover:-translate-y-0.5 ${
-                  activeRecordingField === "global"
+                className={`relative flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] shadow-sm transition hover:-translate-y-0.5 ${activeRecordingField === "global"
                     ? "animate-pulse border-red-500 bg-red-50 text-red-600"
                     : "border-[var(--border-medium)] bg-white text-[var(--ink)]"
-                }`}
+                  }`}
               >
                 {activeRecordingField === "global" && (
                   <span className="h-2 w-2 rounded-full bg-red-600" />
@@ -147,6 +150,28 @@ export default function AppHeader() {
                     ? "Stop Recording"
                     : "Record"}
               </button>
+              {!activitySidebarOpen && (
+                <button
+                  onClick={onToggleActivity}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                  title="Show activity"
+                  aria-label="Show activity"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M15 6l-6 6 6 6" />
+                  </svg>
+                </button>
+              )}
               {globalTranscript && (
                 <button
                   onClick={applyVoiceToNotes}
@@ -159,6 +184,29 @@ export default function AppHeader() {
             </div>
             {voiceError && <p className="text-xs text-red-600">{voiceError}</p>}
           </div>
+        )}
+
+        {!isFirstRun && ui.activeView !== "brainstorm" && !selectedProject && !activitySidebarOpen && (
+          <button
+            onClick={onToggleActivity}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+            title="Show activity"
+            aria-label="Show activity"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
         )}
       </div>
     </header>

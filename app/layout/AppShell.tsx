@@ -71,7 +71,10 @@ export default function AppShell() {
               : styles.mainOverflowDefault
           }`}
         >
-          <AppHeader />
+          <AppHeader
+            activitySidebarOpen={showActivitySidebar}
+            onToggleActivity={() => setShowActivitySidebar((prev) => !prev)}
+          />
           <div
             className={`${styles.contentWrap} ${
               ui.activeView === "brainstorm" ? "py-6 max-w-none" : "py-10 pb-20 max-w-5xl"

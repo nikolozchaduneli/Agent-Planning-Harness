@@ -118,16 +118,13 @@ input[type="radio"] {
 
 @keyframes pin-pop {
   0% {
-    transform: scale(0.9);
-    opacity: 0;
+    transform: translateY(-60%) scale(0.9);
   }
   60% {
-    transform: scale(1.05);
-    opacity: 1;
+    transform: translateY(-60%) scale(1.05);
   }
   100% {
-    transform: scale(1);
-    opacity: 1;
+    transform: translateY(-60%) scale(1);
   }
 }
 

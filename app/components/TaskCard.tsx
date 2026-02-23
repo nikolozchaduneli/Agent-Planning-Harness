@@ -87,9 +87,9 @@ export default function TaskCard({
               onClick={() => onTogglePin?.(task.id)}
               title={task.pinned ? "Unpin task" : "Pin task"}
               aria-label={task.pinned ? "Unpin task" : "Pin task"}
-              className={`absolute left-0 top-1/2 -translate-y-[60%] flex h-7 w-7 items-center justify-center rounded-full border bg-white text-[var(--accent)] shadow-sm transition hover:-translate-y-[65%] ${
+              className={`absolute left-0 top-1/2 -translate-y-[60%] flex h-7 w-7 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-[65%] ${
                 task.pinned
-                  ? "pin-indicator border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_6px_14px_-8px_rgba(249,115,22,0.9)]"
+                  ? "pin-indicator border-[var(--accent)] bg-white text-[var(--accent)] shadow-[0_6px_14px_-8px_rgba(249,115,22,0.9)]"
                   : "border-[var(--border-medium)] bg-white text-[var(--accent)]"
               }`}
             >

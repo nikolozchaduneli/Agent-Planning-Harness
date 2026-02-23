@@ -7,9 +7,12 @@ import { useShallow } from "zustand/react/shallow";
 
 const styles = {
   wrapper:
-    "no-scrollbar relative flex flex-shrink-0 flex-col overflow-y-auto overflow-x-hidden border-l border-[var(--border-subtle)] bg-white/60 shadow-sm transition-[width] duration-500 ease-out",
+    "relative flex-shrink-0 overflow-visible transition-all duration-500 ease-out",
   toggleButton:
-    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--muted)] shadow transition hover:text-[var(--ink)]",
+    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
+  toggleButtonOpen: "shrink-0",
+  aside:
+    "no-scrollbar flex h-full w-full flex-col overflow-hidden bg-white/60 shadow-sm transition-all duration-500 ease-out",
 };
 
 type RightSidebarProps = {
@@ -31,35 +34,46 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
     ),
   );
 
-  return (
-    <aside
-      className={`${styles.wrapper} ${
-        isOpen ? "w-72 p-3" : "w-12 p-3"
-      }`}
+  const renderToggleButton = (className: string) => (
+    <button
+      onClick={onToggle}
+      className={`${styles.toggleButton} ${className}`}
+      title={isOpen ? "Hide activity" : "Show activity"}
+      aria-label={isOpen ? "Hide activity" : "Show activity"}
     >
-      <div className={`flex ${isOpen ? "justify-end" : "justify-center"}`}>
-        <button onClick={onToggle} className={styles.toggleButton}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d={isOpen ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
-          </svg>
-        </button>
-      </div>
-      {isOpen && (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d={isOpen ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+      </svg>
+    </button>
+  );
+
+  return (
+    <div className={`${styles.wrapper} ${isOpen ? "w-72" : "w-0"}`}>
+      <aside
+        className={`${styles.aside} ${
+          isOpen
+            ? "translate-x-0 border-l border-[var(--border-subtle)] p-3 opacity-100"
+            : "translate-x-6 border-l-0 p-0 opacity-0 pointer-events-none"
+        }`}
+      >
         <>
-          <div className="mb-6 mt-3 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-[var(--muted)]">
-              Activity
-            </h3>
+          <div className="mb-6 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {isOpen && renderToggleButton(styles.toggleButtonOpen)}
+              <h3 className="pl-1 text-sm font-semibold text-[var(--muted)]">
+                Activity
+              </h3>
+            </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] shadow">
                 <button
@@ -110,7 +124,7 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
               ))}
           </div>
         </>
-      )}
-    </aside>
+      </aside>
+    </div>
   );
 }
