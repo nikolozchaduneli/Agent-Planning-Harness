@@ -1,6 +1,6 @@
 # Task Centric Planner
 
-Web MVP for project‑based daily planning with AI‑suggested tasks, timeboxing, and progress history. Data is stored locally in the browser.
+Web MVP for project-based daily planning with AI-suggested tasks, timeboxing, and progress history. Data is stored locally in the browser.
 
 ## Run locally
 
@@ -27,7 +27,7 @@ Notes:
 - Use `AZURE_OPENAI_ENDPOINT` for standard Azure OpenAI resources.
 - If you prefer the Foundry-provided full Responses URL, set `AZURE_OPENAI_RESPONSES_URL` instead (it overrides the base endpoint).
 
-Voice transcription is stubbed with a placeholder call. You can wire your Azure voice endpoint here:
+Voice transcription proxies to Azure when configured and returns a stub transcript when it is not configured. You can wire your Azure voice endpoint here:
 
 ```
 AZURE_VOICE_ENDPOINT=
@@ -40,6 +40,6 @@ AZURE_VOICE_API_VERSION=2025-03-01-preview
 
 - `app/page.tsx`: main UI
 - `app/api/ai/generate-tasks`: AI task generation endpoint
-- `app/api/voice/transcribe`: voice stub endpoint
+- `app/api/voice/transcribe`: voice proxy endpoint (stub response when not configured)
 - `lib/store.ts`: Zustand store and actions
 - `lib/storage.ts`: IndexedDB + localStorage persistence

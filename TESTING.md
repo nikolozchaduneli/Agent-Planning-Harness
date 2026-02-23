@@ -1,7 +1,6 @@
 # Testing Guide (New User Lens)
 
-Use this as a short checklist to evaluate the app like a first‑time user. Do not assume how it is supposed to work; follow what feels intuitive. If something is confusing, non‑obvious, or surprising, call it out.
-
+Use this as a short checklist to evaluate the app like a first-time user. Do not assume how it is supposed to work; follow what feels intuitive. If something is confusing, non-obvious, or surprising, call it out.
 
 ## Environment Rules (Must Follow)
 
@@ -13,35 +12,39 @@ Use this as a short checklist to evaluate the app like a first‑time user. Do n
 ## Core Flow
 
 1. Open the app in a clean browser profile (no saved state).
-2. Try the obvious first step on the landing screen.
-3. Create a project and confirm you land in the main planner.
-4. Try adding a milestone and a task using the most discoverable controls.
-5. Generate AI tasks, then pin 1-2 tasks and regenerate unpinned to confirm pinned tasks persist.
-6. If budget allows, try "Append new batch" and confirm totals stay within budget.
-7. Mark a task done and verify progress feedback.
-8. Navigate to other tabs (drawing board, focus, history, settings) and note if they are discoverable and useful without explanation.
+2. On first load, confirm the Create Project form is the obvious first step.
+3. Create a project and confirm you land in the Plan view.
+4. Add a milestone from the left sidebar and confirm it appears in the milestone dropdown.
+5. Add a manual task with an estimate.
+6. Generate AI tasks and confirm:
+   - A new AI batch header appears.
+   - Tasks match the selected milestone (or Whole Project).
+7. Pin 1-2 AI tasks, regenerate, and confirm pinned tasks remain.
+8. If budget allows, try regenerate append behavior; if budget is full, confirm the prompt appears.
+9. Mark a task done and confirm it appears in Activity.
+10. Navigate to Drawing Board, Focus, History, and Settings; confirm the nav is discoverable.
 
 ## Milestone Coherence Checks
 
 1. Create at least 2 milestones (e.g., Alpha, Beta) with clearly different scope.
-2. Select Milestone Alpha in the “Target Milestone” dropdown.
+2. Select Milestone Alpha in the Target Milestone dropdown.
 3. Generate AI tasks and verify:
-   - The AI batch header shows “AI tasks — Milestone Alpha”.
-   - Tasks are narrowly scoped to Alpha and do not drift into Beta’s scope.
-   - Task granularity stays consistent with the milestone (no overly broad, project-wide tasks).
-4. Repeat for Milestone Beta and compare overlap across both sets.
-5. If you see scope leakage or mismatched granularity, log it in `TESTING_ISSUES.md` and take a screenshot.
-6. If the milestone context is ignored, note whether “AI uses: <milestone>” displayed correctly at the time.
+   - The AI batch header shows the correct milestone label.
+   - Tasks are scoped to Alpha and do not drift into Beta.
+4. Repeat for Milestone Beta and compare overlap.
+5. If you see scope leakage, log it in `TESTING_ISSUES.md` and take a screenshot.
+6. If the milestone context seems ignored, verify the dropdown selection was correct.
 
 ## Pin/Regenerate Coherence Checks
 
-1. Pin 1-3 tasks in the active milestone batch.
-2. Regenerate unpinned and confirm:
-   - Pinned tasks remain intact and stay under the same milestone batch header.
+1. Pin 1-3 AI tasks in the active milestone batch.
+2. Regenerate and confirm:
+   - Pinned tasks remain under the same batch header.
    - Only unpinned tasks are replaced.
-   - The remaining budget shown in the modal is accurate and matches planned totals after regen.
-3. Try “Append new batch” when budget allows and confirm it appends a new batch for the same milestone (not a different one).
-4. If budget is full, “Append new batch” must be disabled and show 0 remaining.
+3. If the budget is full, confirm:
+   - The replace/adjust prompt appears.
+   - "Adjust today's time" opens the budget override UI.
+4. If pinned tasks fill the budget, confirm the warning message appears.
 
 ## UI/UX Checks
 
@@ -53,12 +56,17 @@ Use this as a short checklist to evaluate the app like a first‑time user. Do n
 
 ## Functional Checks
 
-1. Required fields behave as expected.
-2. Data persists after refresh (or clearly resets, if intended).
-3. Date changes isolate tasks correctly (if dates are used).
+1. Required fields behave as expected (name + goal are required).
+2. Data persists after refresh.
+3. Date changes isolate tasks correctly in Plan and Activity.
 4. Actions produce immediate, visible feedback.
 5. AI regeneration respects remaining budget (append should disable when budget is full).
-6. Activity Trail toggles between Today and All without losing entries.
+6. Activity toggle switches between Today and All without losing entries.
+
+## Voice Capture Checks (Optional)
+
+1. Record a short note and confirm it transcribes.
+2. Click "Add to plan notes" and confirm it appears in plan notes.
 
 ## Screenshot Policy
 
