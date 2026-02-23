@@ -8,6 +8,10 @@
   --panel: #fffaf2;
   --muted: #7c6f5b;
   --ring: rgba(249, 115, 22, 0.35);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-medium: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.32);
+  --bg-hover: rgba(15, 23, 42, 0.04);
 }
 
 @theme inline {
@@ -19,6 +23,29 @@
 
 * {
   box-sizing: border-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.18);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.28);
 }
 
 body {
@@ -59,19 +86,24 @@ input[type="radio"] {
 }
 
 @keyframes attention-shake {
+
   0%,
   100% {
     transform: translateX(0);
   }
+
   20% {
     transform: translateX(-4px);
   }
+
   40% {
     transform: translateX(4px);
   }
+
   60% {
     transform: translateX(-3px);
   }
+
   80% {
     transform: translateX(3px);
   }
@@ -82,4 +114,23 @@ input[type="radio"] {
   outline-offset: 2px;
   box-shadow: 0 8px 20px -16px rgba(249, 115, 22, 0.65);
   animation: attention-shake 0.7s ease-in-out;
+}
+
+@keyframes pin-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pin-indicator {
+  animation: pin-pop 220ms ease-out;
 }

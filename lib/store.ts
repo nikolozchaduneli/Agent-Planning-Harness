@@ -38,6 +38,7 @@ type StoreActions = {
   addTasks: (tasks: Task[]) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   updateTaskEstimate: (taskId: string, estimateMinutes: number) => void;
+  updateTaskDetails: (taskId: string, data: Partial<Pick<Task, "title" | "description">>) => void;
   toggleTaskPinned: (taskId: string) => void;
   removeTasks: (taskIds: string[]) => void;
   detachTasksFromPlan: (date: string, projectId: string, taskIds: string[]) => void;
@@ -147,6 +148,12 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
     set((state) => ({
       tasks: state.tasks.map((task) =>
         task.id === taskId ? { ...task, estimateMinutes } : task,
+      ),
+    })),
+  updateTaskDetails: (taskId, data) =>
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId ? { ...task, ...data } : task,
       ),
     })),
   toggleTaskPinned: (taskId) =>

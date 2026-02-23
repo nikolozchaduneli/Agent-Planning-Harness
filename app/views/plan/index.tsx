@@ -1,0 +1,515 @@
+﻿"use client";
+
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { isoToday } from "@/lib/constants";
+import { useAppStore } from "@/lib/store";
+import type { DailyPlan, Task } from "@/lib/types";
+import { selectAiBatchMeta } from "@/lib/selectors";
+import useAiGeneration from "@/app/hooks/useAiGeneration";
+import useBudgetDisplay from "@/app/hooks/useBudgetDisplay";
+import useStickyRegenBar from "@/app/hooks/useStickyRegenBar";
+import DictationMic from "@/app/components/DictationMic";
+import useVoiceRecording from "@/app/hooks/useVoiceRecording";
+import TaskCard from "@/app/components/TaskCard";
+import BudgetBar from "@/app/views/plan/BudgetBar";
+import MilestoneSelector from "@/app/views/plan/MilestoneSelector";
+import ManualTaskForm from "@/app/views/plan/ManualTaskForm";
+import StickyRegenBar from "@/app/views/plan/StickyRegenBar";
+
+export default function PlanView() {
+  const projects = useAppStore((state) => state.projects);
+  const tasks = useAppStore((state) => state.tasks);
+  const dailyPlans = useAppStore((state) => state.dailyPlans);
+  const milestones = useAppStore((state) => state.milestones);
+  const ui = useAppStore((state) => state.ui);
+  const addTasks = useAppStore((state) => state.addTasks);
+  const attachTasksToPlan = useAppStore((state) => state.attachTasksToPlan);
+  const updateTaskStatus = useAppStore((state) => state.updateTaskStatus);
+  const updateTaskEstimate = useAppStore((state) => state.updateTaskEstimate);
+  const updateTaskDetails = useAppStore((state) => state.updateTaskDetails);
+  const toggleTaskPinned = useAppStore((state) => state.toggleTaskPinned);
+  const removeTasks = useAppStore((state) => state.removeTasks);
+  const detachTasksFromPlan = useAppStore((state) => state.detachTasksFromPlan);
+  const removeProgressEntriesForTasks = useAppStore((state) => state.removeProgressEntriesForTasks);
+  const setFocusTask = useAppStore((state) => state.setFocusTask);
+  const setView = useAppStore((state) => state.setView);
+  const upsertDailyPlan = useAppStore((state) => state.upsertDailyPlan);
+
+  const selectedProject = projects.find((project) => project.id === ui.selectedProjectId);
+  const selectedDate = ui.selectedDate || isoToday();
+
+  const [planNotes, setPlanNotes] = useState("");
+  const [notesFromVoice, setNotesFromVoice] = useState<string | null>(null);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualEstimate, setManualEstimate] = useState(25);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
+  const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
+  const sidebarMilestoneSelectRef = useRef(false);
+
+  const activePlan = useMemo(() => {
+    if (!selectedProject) return undefined;
+    return dailyPlans.find(
+      (plan) => plan.projectId === selectedProject.id && plan.date === selectedDate,
+    );
+  }, [dailyPlans, selectedDate, selectedProject]);
+
+  const planTaskIds = activePlan?.taskIds ?? [];
+  const planTasks = useMemo(() => {
+    if (!planTaskIds.length) return [];
+    const idSet = new Set(planTaskIds);
+    return tasks.filter((task) => idSet.has(task.id));
+  }, [planTaskIds, tasks]);
+
+  const totalPlanned = planTasks.reduce((sum, task) => sum + task.estimateMinutes, 0);
+  const budget =
+    activePlan?.timeBudgetOverrideMinutes ?? selectedProject?.constraints.timeBudgetMinutes ?? 0;
+  const hasBudgetOverride = typeof activePlan?.timeBudgetOverrideMinutes === "number";
+  const hasPlanTasks = planTasks.length > 0;
+
+  const projectMilestones = useMemo(() => {
+    if (!selectedProject) return [];
+    return milestones.filter((milestone) => milestone.projectId === selectedProject.id);
+  }, [milestones, selectedProject]);
+  const selectedMilestone = selectedMilestoneId
+    ? projectMilestones.find((milestone) => milestone.id === selectedMilestoneId)
+    : undefined;
+
+  const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
+
+  const {
+    isGenerating,
+    isGeneratingMilestones,
+    aiError,
+    aiScopeWarning,
+    aiPrompt,
+    setAiPrompt,
+    regenBudgetMessage,
+    setRegenBudgetMessage,
+    runAiGeneration,
+    handleGenerateTasks,
+    handleProposeMilestones,
+  } = useAiGeneration(selectedProject?.id, selectedMilestoneId);
+
+  const {
+    budgetPulse,
+    plannedTick,
+    showBudgetOverride,
+    setShowBudgetOverride,
+    budgetOverrideDraft,
+    setBudgetOverrideDraft,
+    budgetPercent,
+    isOverBudget,
+  } = useBudgetDisplay(totalPlanned, budget);
+
+  const milestoneDropdownRef = useRef<HTMLDivElement | null>(null);
+  const {
+    showStickyRegen,
+    setShouldScrollToRegenMessage,
+    focusHighlight,
+    regenMessageRef,
+    aiPromptRef,
+  } = useStickyRegenBar(
+    milestoneDropdownRef,
+    ui.activeView,
+    hasPlanTasks,
+    !!aiPrompt,
+    !!regenBudgetMessage,
+  );
+
+  const shouldShowStickyBar = showStickyRegen && !!selectedProject && hasPlanTasks;
+
+  const regenDepsRef = useRef({
+    totalPlanned,
+    budget,
+    selectedMilestoneId,
+  });
+  useEffect(() => {
+    if (!regenBudgetMessage) {
+      regenDepsRef.current = { totalPlanned, budget, selectedMilestoneId };
+      return;
+    }
+    const prev = regenDepsRef.current;
+    const changed =
+      prev.totalPlanned !== totalPlanned ||
+      prev.budget !== budget ||
+      prev.selectedMilestoneId !== selectedMilestoneId;
+    if (changed) {
+      setRegenBudgetMessage(null);
+    }
+    regenDepsRef.current = { totalPlanned, budget, selectedMilestoneId };
+  }, [totalPlanned, budget, selectedMilestoneId, regenBudgetMessage, setRegenBudgetMessage]);
+
+  useEffect(() => {
+    if (projectMilestones.length > 0) {
+      setShowMilestonePrompt(false);
+    }
+  }, [projectMilestones.length]);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("planning-milestone-change", { detail: selectedMilestoneId }),
+    );
+  }, [selectedMilestoneId]);
+
+  useEffect(() => {
+    const handleSidebarMilestoneSelect = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail ?? "";
+      sidebarMilestoneSelectRef.current = true;
+      setSelectedMilestoneId(detail);
+    };
+    window.addEventListener(
+      "planning-milestone-select",
+      handleSidebarMilestoneSelect as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "planning-milestone-select",
+        handleSidebarMilestoneSelect as EventListener,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showBudgetOverride && !hasBudgetOverride) return;
+    const existing = activePlan?.timeBudgetOverrideMinutes;
+    setBudgetOverrideDraft(typeof existing === "number" ? String(existing) : "");
+  }, [showBudgetOverride, hasBudgetOverride, activePlan?.timeBudgetOverrideMinutes, setBudgetOverrideDraft]);
+
+  useEffect(() => {
+    const handleTranscript = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail) setNotesFromVoice(detail);
+    };
+    const handleApply = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (!detail) return;
+      if (ui.activeView !== "plan") {
+        setView("plan");
+      }
+      setPlanNotes((prev) => (prev ? `${prev}\n${detail}` : detail));
+      setNotesFromVoice(null);
+    };
+    window.addEventListener("global-transcript", handleTranscript as EventListener);
+    window.addEventListener("apply-plan-notes", handleApply as EventListener);
+    return () => {
+      window.removeEventListener("global-transcript", handleTranscript as EventListener);
+      window.removeEventListener("apply-plan-notes", handleApply as EventListener);
+    };
+  }, [setView, ui.activeView]);
+
+  const ensurePlan = () => {
+    if (!selectedProject) return;
+    if (activePlan) return;
+    const plan: DailyPlan = {
+      id: crypto.randomUUID(),
+      projectId: selectedProject.id,
+      date: selectedDate,
+      taskIds: [],
+      timeBudgetOverrideMinutes: undefined,
+      createdAt: new Date().toISOString(),
+    };
+    upsertDailyPlan(plan);
+  };
+
+  const handleAddManualTask = () => {
+    if (!selectedProject || !manualTitle.trim()) return;
+    ensurePlan();
+    const task: Task = {
+      id: crypto.randomUUID(),
+      projectId: selectedProject.id,
+      title: manualTitle.trim(),
+      estimateMinutes: manualEstimate,
+      status: "todo",
+      createdAt: new Date().toISOString(),
+      source: "manual",
+      milestoneId: selectedMilestoneId || undefined,
+    };
+    addTasks([task]);
+    attachTasksToPlan(selectedDate, selectedProject.id, [task.id]);
+    setManualTitle("");
+  };
+
+  const handleRemoveTask = (taskId: string) => {
+    if (!selectedProject) return;
+    removeTasks([taskId]);
+    detachTasksFromPlan(selectedDate, selectedProject.id, [taskId]);
+    removeProgressEntriesForTasks([taskId]);
+  };
+
+  const handlePlanBudgetOverrideChange = (value: number) => {
+    if (!selectedProject) return;
+    ensurePlan();
+    const clamped = Math.max(30, Math.min(720, value || 0));
+    const plan: DailyPlan = activePlan
+      ? { ...activePlan, timeBudgetOverrideMinutes: clamped }
+      : {
+          id: crypto.randomUUID(),
+          projectId: selectedProject.id,
+          date: selectedDate,
+          taskIds: [],
+          timeBudgetOverrideMinutes: clamped,
+          createdAt: new Date().toISOString(),
+        };
+    upsertDailyPlan(plan);
+  };
+
+  const clearPlanBudgetOverride = () => {
+    if (!selectedProject || !activePlan) return;
+    upsertDailyPlan({ ...activePlan, timeBudgetOverrideMinutes: undefined });
+  };
+
+  const milestoneTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    projectMilestones.forEach((milestone) => map.set(milestone.id, milestone.title));
+    return map;
+  }, [projectMilestones]);
+
+  const aiBatchMeta = useMemo(
+    () => selectAiBatchMeta(planTasks, milestoneTitleById),
+    [planTasks, milestoneTitleById],
+  );
+
+  const handleGenerate = async (skipMilestonePrompt?: boolean) => {
+    await handleGenerateTasks({
+      notes: planNotes,
+      skipMilestonePrompt,
+      onRequireMilestonePrompt: () => setShowMilestonePrompt(true),
+      setShouldScrollToRegenMessage,
+    });
+  };
+
+  const handleStickyGenerate = async () => {
+    setShouldScrollToRegenMessage(true);
+    await handleGenerate();
+  };
+
+  useEffect(() => {
+    if (!sidebarMilestoneSelectRef.current) return;
+    sidebarMilestoneSelectRef.current = false;
+    milestoneDropdownRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedMilestoneId]);
+
+  const handleRunAiGeneration = (remainingBudget: number, removeTaskIds: string[]) => {
+    runAiGeneration(remainingBudget, removeTaskIds, planNotes);
+  };
+
+  return (
+    <section
+      className={`grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] ${
+        selectedProject ? "pb-24" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl mb-2">
+            Daily Plan for{" "}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new Event("open-left-sidebar"));
+              }}
+              className="font-semibold text-[var(--accent)] transition hover:opacity-80"
+            >
+              {selectedProject ? selectedProject.name : "your project"}
+            </button>
+          </h2>
+          <p className="text-sm text-[var(--muted)]">
+            Generate, review, and organize today&apos;s tasks and notes for one focused project.
+          </p>
+        </div>
+        <BudgetBar
+          totalPlanned={totalPlanned}
+          budget={budget}
+          isOverBudget={isOverBudget}
+          budgetPercent={budgetPercent}
+          plannedTick={plannedTick}
+          budgetPulse={budgetPulse}
+          hasBudgetOverride={hasBudgetOverride}
+          showBudgetOverride={showBudgetOverride}
+          setShowBudgetOverride={setShowBudgetOverride}
+          budgetOverrideDraft={budgetOverrideDraft}
+          setBudgetOverrideDraft={setBudgetOverrideDraft}
+          onSaveOverride={handlePlanBudgetOverrideChange}
+          onClearOverride={clearPlanBudgetOverride}
+        />
+      </div>
+
+      {!selectedProject && (
+        <div className="rounded-2xl border border-dashed border-[rgba(15,23,42,0.2)] p-6 text-sm text-[var(--muted)]">
+          Select a project to build a plan.
+        </div>
+      )}
+
+      {selectedProject && (
+        <>
+          <div className="flex flex-col gap-3">
+            <MilestoneSelector
+              projectMilestones={projectMilestones}
+              selectedMilestoneId={selectedMilestoneId}
+              setSelectedMilestoneId={setSelectedMilestoneId}
+              showMilestonePrompt={showMilestonePrompt}
+              setShowMilestonePrompt={setShowMilestonePrompt}
+              milestoneDropdownRef={milestoneDropdownRef}
+              aiPrompt={aiPrompt}
+              setAiPrompt={setAiPrompt}
+              aiScopeWarning={aiScopeWarning}
+              aiError={aiError}
+              isGeneratingMilestones={isGeneratingMilestones}
+              handleProposeMilestones={handleProposeMilestones}
+              onContinueWithoutMilestones={() => handleGenerate(true)}
+              onRunAiGeneration={handleRunAiGeneration}
+              budget={budget}
+              setShowBudgetOverride={setShowBudgetOverride}
+              setBudgetOverrideDraft={setBudgetOverrideDraft}
+              focusHighlight={focusHighlight}
+              aiPromptRef={aiPromptRef}
+            />
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-[var(--muted)]">
+                Today&apos;s Notes
+              </label>
+              <div className="relative flex items-center focus-within:ring-2 focus-within:ring-[var(--ring)] rounded-2xl shadow-[0_0_0_1px_rgba(15,23,42,0.1)] bg-[var(--panel)]">
+                <textarea
+                  value={planNotes}
+                  onChange={(event) => setPlanNotes(event.target.value)}
+                  rows={2}
+                  className="w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-3 placeholder:text-sm focus:outline-none pr-12"
+                  placeholder="What should you remember while working today?"
+                />
+                <div className="absolute right-2 top-2">
+                  <DictationMic
+                    isRecording={activeRecordingField === "planNotes"}
+                    onClick={() => {
+                      if (activeRecordingField === "planNotes") stopRecording();
+                      else
+                        startRecording(
+                          "planNotes",
+                          (text) => setPlanNotes((prev) => (prev ? `${prev}\n${text}` : text)),
+                          "Context: These are raw planning notes for the day.",
+                        );
+                    }}
+                  />
+                </div>
+              </div>
+              {notesFromVoice && (
+                <p className="text-xs text-[var(--muted)]">
+                  Voice capture ready — use the header button to add it to notes.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1 text-sm font-semibold text-[var(--muted)]">
+            <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
+            <span>Manual Tasks</span>
+            <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
+          </div>
+
+          <ManualTaskForm
+            manualTitle={manualTitle}
+            setManualTitle={setManualTitle}
+            manualEstimate={manualEstimate}
+            setManualEstimate={setManualEstimate}
+            onAdd={handleAddManualTask}
+            selectedMilestoneTitle={selectedMilestone?.title}
+          />
+
+          <div className="grid gap-3">
+            {planTasks.length === 0 && (
+              <p className="text-sm text-[var(--muted)]">No tasks yet for this day.</p>
+            )}
+            {(() => {
+              const seenBatches = new Set<string>();
+              return planTasks.map((task) => {
+                const batchKey =
+                  task.source === "ai"
+                    ? task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`
+                    : null;
+                const showBatchHeader = batchKey ? !seenBatches.has(batchKey) : false;
+                if (showBatchHeader && batchKey) seenBatches.add(batchKey);
+                const batchMeta = batchKey ? aiBatchMeta.get(batchKey) : undefined;
+
+                return (
+                  <Fragment key={task.id}>
+                    {showBatchHeader && batchMeta && (
+                      <div className="rounded-full bg-[var(--panel)] px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                        {batchMeta.label} ·{" "}
+                        {new Date(batchMeta.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    )}
+                    <TaskCard
+                      task={task}
+                      mode="plan"
+                      onStatusChange={updateTaskStatus}
+                      onEstimateChange={updateTaskEstimate}
+                      onTogglePin={toggleTaskPinned}
+                      onUpdateDetails={updateTaskDetails}
+                      onRemove={handleRemoveTask}
+                      onFocus={(id) => {
+                        setFocusTask(id);
+                        setView("focus");
+                      }}
+                    />
+                  </Fragment>
+                );
+              });
+            })()}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setShouldScrollToRegenMessage(true);
+                handleGenerate();
+              }}
+              className="flex items-center justify-center gap-2 self-start rounded-full bg-[var(--accent)] px-5 py-3 text-xs uppercase tracking-[0.25em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
+              disabled={isGenerating}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="overflow-visible"
+                aria-hidden="true"
+              >
+                <path d="m5 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+                <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
+              </svg>
+              {isGenerating ? "Generating..." : "Generate Tasks"}
+            </button>
+            <p className="text-xs text-[var(--muted)]">
+              AI generation respects your pinned tasks and budget constraints.
+            </p>
+          </div>
+
+          {regenBudgetMessage && (
+            <div
+              ref={regenMessageRef}
+              className={focusHighlight === "regenMessage" ? "attention-highlight rounded-xl" : ""}
+            >
+              <p className="text-xs text-[var(--ink)]">{regenBudgetMessage}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      <StickyRegenBar
+        show={shouldShowStickyBar}
+        projectMilestones={projectMilestones}
+        selectedMilestoneId={selectedMilestoneId}
+        setSelectedMilestoneId={setSelectedMilestoneId}
+        onGenerate={handleStickyGenerate}
+        isGenerating={isGenerating}
+      />
+    </section>
+  );
+}
