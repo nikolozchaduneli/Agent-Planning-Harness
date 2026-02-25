@@ -23,13 +23,13 @@ export default function ManualTaskForm({
 
   return (
     <div className="grid gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 flex items-center">
+      <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+        <div className="relative flex w-full min-w-0 flex-1 items-center">
           <input
             value={manualTitle}
             onChange={(event) => setManualTitle(event.target.value)}
             placeholder="Add a manual task"
-            className="w-full rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="h-10 w-full rounded-xl border border-transparent bg-[var(--panel)] px-3 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
           />
           <div className="absolute right-1">
             <DictationMic
@@ -50,7 +50,7 @@ export default function ManualTaskForm({
             />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 md:w-auto md:justify-self-start">
           <span className="text-[11px] font-medium text-[var(--muted)]">
             Time
           </span>
@@ -70,23 +70,26 @@ export default function ManualTaskForm({
               onChange={(event) =>
                 setManualEstimate(event.target.value === "" ? 0 : Number(event.target.value))
               }
-              className="w-24 rounded-xl border border-[var(--border-medium)] bg-white/90 px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="h-10 w-24 rounded-xl border border-[var(--border-medium)] bg-white/90 px-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             />
             <span className="text-[11px] font-medium text-[var(--muted)]">min</span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex w-full justify-start md:w-auto md:justify-self-end">
           <button
             onClick={onAdd}
-            className="rounded-full border border-[var(--border-medium)] bg-white px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow transition hover:-translate-y-0.5"
+            className="h-10 rounded-full border border-[var(--border-medium)] bg-white px-5 text-xs font-semibold text-[var(--ink)] shadow transition hover:-translate-y-0.5"
           >
             Add
           </button>
-          <span className="text-[10px] text-[var(--muted)] max-w-[140px] truncate">
-            Scope: {selectedMilestoneTitle || "Whole Project"}
-          </span>
         </div>
       </div>
+      <p className="text-[11px] text-[var(--muted)]">
+        Scope:{" "}
+        <span className="font-medium text-[var(--ink)]">
+          {selectedMilestoneTitle || "Whole Project"}
+        </span>
+      </p>
     </div>
   );
 }

@@ -25,11 +25,11 @@ export default function useBrainstorm() {
     }
   }, [brainstormMessages, ui.activeView]);
 
-  const handleBrainstorm = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!brainstormInput.trim() || isBrainstorming) return;
+  const submitBrainstormMessage = async (rawContent: string) => {
+    if (isBrainstorming) return;
+    const content = rawContent.trim();
+    if (!content) return;
 
-    const content = brainstormInput.trim();
     setBrainstormInput("");
     addBrainstormMessage("user", content);
     setIsBrainstorming(true);
@@ -62,10 +62,16 @@ export default function useBrainstorm() {
     }
   };
 
+  const handleBrainstorm = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    await submitBrainstormMessage(brainstormInput);
+  };
+
   return {
     brainstormInput,
     setBrainstormInput,
     isBrainstorming,
     handleBrainstorm,
+    submitBrainstormMessage,
   };
 }

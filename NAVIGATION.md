@@ -1,40 +1,71 @@
 # Navigation
 
-## High-level map
-- `app/page.tsx` hydrates state from storage and persists changes.
-- `app/layout/AppShell.tsx` is the app shell and view router.
-- `lib/store.ts` holds the Zustand store (state + actions).
-- `lib/types.ts` defines domain types used across UI and store.
-- `lib/selectors.ts` holds derived selectors and filters.
-- `app/api/ai/*` contains AI endpoints (tasks, milestones, brainstorm).
-- `app/api/voice/transcribe/route.ts` contains the voice proxy.
+Last updated: 2026-02-25
+Use this as a fast map to where behavior actually lives.
 
-## Views
-- `app/views/OnboardingView.tsx`: initial screen (Create Project).
-- `app/views/plan/index.tsx`: plan view orchestration.
-- `app/views/FocusView.tsx`: focus-only task display.
-- `app/views/HistoryView.tsx`: analytics + recent completion history.
-- `app/views/BrainstormView.tsx`: drawing board chat and draft canvas.
-- `app/views/settings/index.tsx`: project settings + milestone editing.
+## Entry points
+- `app/page.tsx`: app bootstrap, hydration, and persistence subscription.
+- `app/layout/AppShell.tsx`: global shell, first-run branching, view routing, responsive sidebars.
+- First-run rule in `AppShell`: render `OnboardingView` by default, but render `BrainstormView` when `ui.activeView === "brainstorm"` even if no projects exist.
+- `app/layout/AppHeader.tsx`: top navigation, date selection, global voice capture, activity-sidebar toggle.
 
-## Layout
-- `app/layout/AppHeader.tsx`: top nav + date control + voice capture.
-- `app/layout/LeftSidebar.tsx`: project context, milestones, progress.
-- `app/layout/RightSidebar.tsx`: activity panel + Today/All toggle.
+## State and data core
+- `lib/types.ts`: domain model.
+- `lib/store.ts`: all state mutations/actions.
+- `lib/selectors.ts`: derived reads (`active plan`, `plan tasks`, `scoped activities`, AI batch metadata, history).
+- `lib/storage.ts`: IndexedDB/localStorage persistence + state normalization.
+- `lib/constants.ts`, `lib/forms.ts`: shared UI/util helpers.
+- `ui.planMilestoneByProject` in `lib/types.ts`/`lib/store.ts`: persisted per-project plan milestone scope map.
+
+## Main views
+- `app/views/OnboardingView.tsx`: first-run wrapper around create-project flow.
+- `app/views/BrainstormView.tsx`: Drawing Board chat + live draft canvas.
+- `app/views/plan/index.tsx`: plan orchestration (budget, milestone scope, notes, tasks, generation).
+- `app/views/FocusView.tsx`: single-task execution view.
+- `app/views/HistoryView.tsx`: completion stats + recent history.
+- `app/views/settings/index.tsx`: project editing + milestone editing + existing project picker.
+- `app/views/settings/CreateProjectForm.tsx`: manual/AI-assisted creation entry.
 
 ## Plan view landmarks (`app/views/plan/index.tsx`)
-- Budget + override: search `BudgetBar` and `handlePlanBudgetOverrideChange`.
-- Milestone targeting: search `MilestoneSelector` and `selectedMilestoneId`.
-- AI generation: search `handleGenerateTasks` and `runAiGeneration`.
-- Manual tasks: search `ManualTaskForm` and `handleAddManualTask`.
-- Task list rendering: search `planTasks.map` and `TaskCard`.
-- Sticky regen bar: search `StickyRegenBar` and `useStickyRegenBar`.
+- Active plan resolution: `activePlan`, `planTaskIds`, `planTasks`.
+- Budget + override: `budget`, `hasBudgetOverride`, `handlePlanBudgetOverrideChange`, `clearPlanBudgetOverride`.
+- Milestone scope: `selectedMilestoneId`, `selectedMilestone`, `MilestoneSelector`, `setPlanMilestoneForProject`.
+- AI generation calls: `handleGenerate`, `handleRunAiGeneration`, `handleGenerateTasks`.
+- Manual tasks: `handleAddManualTask`, `ManualTaskForm`.
+- Task list + AI batch headers: `selectAiBatchMeta`, `TaskCard` mapping block.
+- Sticky regenerate controls: `useStickyRegenBar`, `StickyRegenBar`.
 
-## AI endpoints
-- `app/api/ai/generate-tasks/route.ts`: task generation prompt, schema, scope filtering.
-- `app/api/ai/generate-milestones/route.ts`: milestone generation prompt, schema.
-- `app/api/ai/brainstorm/route.ts`: brainstorm flow + draft updates.
+## Shared components
+- `app/components/TaskCard.tsx`: plan/focus task controls (status, estimate, pin, focus, delete, inline edits).
+- `app/components/MilestoneListEditable.tsx`: milestone rename/reorder/delete UI in Settings.
+- `app/components/DictationMic.tsx`: mic button reused across forms.
 
-## Storage + Persistence
-- `lib/storage.ts`: IndexedDB + localStorage fallback, schema normalization.
-- `app/page.tsx`: debounced save (300ms).
+## Hooks (behavior orchestration)
+- `app/hooks/useAiGeneration.ts`: generation/regeneration decisions, budget math, API calls.
+- `app/hooks/useBrainstorm.ts`: brainstorm submit loop and draft updates (`submitBrainstormMessage` powers both form submit and suggestion-chip direct submit).
+- `app/hooks/useVoiceRecording.tsx`: recording lifecycle, transcription upload, shared provider.
+- `app/hooks/useBudgetDisplay.ts`: budget animation + override panel state.
+- `app/hooks/useStickyRegenBar.ts`: sticky regen visibility/focus guidance.
+- `app/hooks/useProjectDrafts.ts`: editable settings drafts, dirty tracking, save/cancel behavior.
+
+## API routes
+- `app/api/ai/generate-tasks/route.ts`: AI task generation, schema validation, fallback tasks, milestone scope filtering.
+- `app/api/ai/generate-milestones/route.ts`: milestone proposal generation + fallback milestones.
+- `app/api/ai/brainstorm/route.ts`: iterative brainstorm responses and draft patching.
+- `app/api/voice/transcribe/route.ts`: Azure voice proxy + fallback transcript.
+
+## Cross-component event bridge
+- `open-left-sidebar`: Plan title link -> `AppShell` opens left sidebar.
+- `planning-milestone-select` / `planning-milestone-change`: sidebar milestone clicks <-> plan milestone selection sync.
+- `global-transcript` / `apply-plan-notes`: header voice capture -> Plan notes insertion.
+
+## Prompt assets
+- `ai-prompts/*` contains prompt text assets.
+- Current runtime API routes inline their prompts and do not read these files yet.
+
+## Where to start for common changes
+- Change how data mutates: `lib/store.ts` first.
+- Change derived filtering/aggregation: `lib/selectors.ts`.
+- Change plan behavior or generation UX: `app/views/plan/index.tsx` + `app/hooks/useAiGeneration.ts`.
+- Change AI payload/validation/fallback: matching route under `app/api/ai/*`.
+- Change voice UX/backend integration: `app/hooks/useVoiceRecording.tsx` + `app/api/voice/transcribe/route.ts`.

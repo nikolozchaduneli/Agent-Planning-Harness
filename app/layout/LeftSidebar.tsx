@@ -9,7 +9,7 @@ import useAiGeneration from "@/app/hooks/useAiGeneration";
 
 const styles = {
   wrapper:
-    "relative flex-shrink-0 overflow-hidden transition-all duration-600 ease-out",
+    "fixed inset-y-0 left-0 z-30 flex-shrink-0 overflow-hidden transition-all duration-600 ease-out md:relative md:inset-auto md:z-auto",
   toggleButton:
     "absolute top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   aside:
@@ -19,7 +19,7 @@ const styles = {
   dropdownPanel:
     "absolute left-0 right-0 z-20 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-[rgba(15,23,42,0.08)] bg-white/95 p-2 shadow-lg backdrop-blur",
   dropdownItem:
-    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-[var(--ink)] transition hover:bg-[var(--panel)]",
+    "flex w-full items-start justify-between gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ink)] text-left transition hover:bg-[var(--panel)]",
 };
 
 type LeftSidebarProps = {
@@ -28,6 +28,12 @@ type LeftSidebarProps = {
 };
 
 export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
+  const formatProjectName = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return name;
+    return trimmed[0].toUpperCase() + trimmed.slice(1);
+  };
+
   const {
     projects,
     tasks,
@@ -119,7 +125,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
   }, [dailyPlans, selectedProject, tasks]);
 
   return (
-    <div className={`${styles.wrapper} ${isOpen ? "w-[320px]" : "w-12"}`}>
+    <div className={`${styles.wrapper} ${isOpen ? "w-[360px]" : "w-12"}`}>
       <button
         onClick={onToggle}
         className={`${styles.toggleButton} ${isOpen ? "right-2" : "left-1/2 -translate-x-[32%]"
@@ -204,7 +210,9 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                           setShowProjectDropdown(false);
                         }}
                       >
-                        <span>{project.name}</span>
+                        <span className="min-w-0 flex-1 break-words whitespace-normal">
+                          {formatProjectName(project.name)}
+                        </span>
                         {ui.selectedProjectId === project.id && (
                           <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
                             Active
@@ -228,10 +236,12 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                     ref={activeProjectButtonRef}
                     id="active-project-select"
                     type="button"
-                    className="group inline-flex items-center gap-2 rounded-lg -mx-1 px-1 py-0.5 text-left text-2xl font-bold font-serif leading-tight tracking-[-0.02em] text-[var(--ink)] transition hover:shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className="group flex w-full items-start justify-between gap-2 rounded-lg -mx-1 px-1 py-0.5 text-left text-2xl font-bold font-serif leading-tight tracking-[-0.02em] text-[var(--ink)] transition hover:shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                     onClick={() => setShowNameDropdown((prev) => !prev)}
                   >
-                    <span>{selectedProject.name}</span>
+                    <span className="min-w-0 flex-1 break-words whitespace-normal">
+                      {formatProjectName(selectedProject.name)}
+                    </span>
                     <svg
                       width="14"
                       height="14"
@@ -241,14 +251,14 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-[var(--muted)] transition group-hover:text-[var(--ink)]"
+                      className="mt-1 shrink-0 text-[var(--muted)] transition group-hover:text-[var(--ink)]"
                       aria-hidden="true"
                     >
                       <path d="M6 9l6 6 6-6" />
                     </svg>
                   </button>
                   {showNameDropdown && (
-                    <div ref={dropdownPanelRef} className={`${styles.dropdownPanel} w-56`}>
+                    <div ref={dropdownPanelRef} className={`${styles.dropdownPanel} w-full`}>
                       {projects.map((project) => (
                         <button
                           key={project.id}
@@ -260,7 +270,9 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                             setShowNameDropdown(false);
                           }}
                         >
-                          <span>{project.name}</span>
+                          <span className="min-w-0 flex-1 break-words whitespace-normal">
+                            {formatProjectName(project.name)}
+                          </span>
                           {ui.selectedProjectId === project.id && (
                             <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
                               Active

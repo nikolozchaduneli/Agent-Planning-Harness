@@ -25,6 +25,7 @@ const defaultState: AppState = {
   ui: {
     selectedDate: todayIso(),
     activeView: "projects",
+    planMilestoneByProject: {},
   },
 };
 
@@ -33,6 +34,7 @@ type StoreActions = {
   setView: (view: AppView) => void;
   setDate: (date: string) => void;
   setSelectedProject: (projectId?: string) => void;
+  setPlanMilestoneForProject: (projectId: string, milestoneId: string) => void;
   upsertProject: (project: Project) => void;
   createProject: (data: Omit<Project, "id" | "createdAt" | "updatedAt">) => Project;
   addTasks: (tasks: Task[]) => void;
@@ -63,7 +65,16 @@ type StoreActions = {
 
 export const useAppStore = create<AppState & StoreActions>((set, get) => ({
   ...defaultState,
-  hydrate: (state) => set(() => state),
+  hydrate: (state) =>
+    set(() => ({
+      ...defaultState,
+      ...state,
+      ui: {
+        ...defaultState.ui,
+        ...state.ui,
+        planMilestoneByProject: state.ui.planMilestoneByProject ?? {},
+      },
+    })),
   setView: (view) => set((state) => ({ ui: { ...state.ui, activeView: view } })),
   setDate: (date) =>
     set((state) => ({ ui: { ...state.ui, selectedDate: date } })),
@@ -71,6 +82,19 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
     set((state) => ({
       ui: { ...state.ui, selectedProjectId: projectId },
     })),
+  setPlanMilestoneForProject: (projectId, milestoneId) =>
+    set((state) => {
+      const current = state.ui.planMilestoneByProject ?? {};
+      const next = { ...current };
+      if (milestoneId) {
+        next[projectId] = milestoneId;
+      } else {
+        delete next[projectId];
+      }
+      return {
+        ui: { ...state.ui, planMilestoneByProject: next },
+      };
+    }),
   createProject: (data) => {
     const now = new Date().toISOString();
     const project: Project = {

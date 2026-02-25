@@ -1,0 +1,26 @@
+Project: ${projectName || "Unspecified"}
+Goal: ${goal}${milestoneContext}${milestonesContext}${otherMilestonesContext}${forbiddenMilestonesContext}
+Time budget (minutes): ${budget || "unspecified"}
+Focus notes: ${focusNotes || "none"}
+User notes: ${notes || "none"}
+
+Create a concise list of tasks with realistic time estimates. Keep tasks actionable and ordered.
+If a target milestone is provided, keep tasks tightly scoped to it and avoid tasks that belong to other milestones.
+If a time budget is provided, the SUM of estimateMinutes across all tasks must be <= that budget.
+
+Optional contexts:
+- milestoneContext: "\nTarget Milestone: ${milestoneTitle}"
+- milestonesContext: "\nAll milestones: ${milestones_joined}"
+- otherMilestonesContext: "\nOther milestones (avoid overlap): ${other_milestones_joined}"
+- forbiddenMilestonesContext: "\nDO NOT include tasks for these milestones: ${other_milestones_joined}"
+
+CRITICAL INSTRUCTIONS:
+- Each task title MUST be 8 words or fewer.
+- Write tasks as CONCRETE ACTIONS, not process descriptions.
+  GOOD: "Implement login page with OAuth"
+  BAD: "Define core requirements and success criteria"
+  BAD: "Draft a scoped implementation plan aligned to constraints"
+- Do NOT echo back the project name, goal text, or focus notes in task titles. Use your own words.
+- The tasks MUST respect the "Focus Notes / Constraints" above. Do not include anything outside that scope.
+- If the goal is very vague (e.g. just a single word or generic phrase), produce practical starting tasks like research, prototype, and first deliverable.
+.

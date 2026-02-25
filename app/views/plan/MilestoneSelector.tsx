@@ -1,4 +1,4 @@
-﻿import type { RefObject } from "react";
+﻿import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { Milestone } from "@/lib/types";
 
 type AiPromptState = {
@@ -55,22 +55,112 @@ export default function MilestoneSelector({
   focusHighlight,
   aiPromptRef,
 }: MilestoneSelectorProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const selectedLabel = useMemo(() => {
+    if (!selectedMilestoneId) return "Whole Project";
+    return (
+      projectMilestones.find((milestone) => milestone.id === selectedMilestoneId)?.title ??
+      "Whole Project"
+    );
+  }, [projectMilestones, selectedMilestoneId]);
+
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const handleClickAway = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (milestoneDropdownRef.current?.contains(target)) return;
+      setIsDropdownOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickAway);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickAway);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isDropdownOpen, milestoneDropdownRef]);
+
+  useEffect(() => {
+    if (isDropdownOpen) setIsDropdownOpen(false);
+  }, [selectedMilestoneId]);
+
   return (
     <div ref={milestoneDropdownRef} className="flex flex-col gap-2 pb-3">
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium text-[var(--ink)]">Generate tasks for</span>
-        <select
-          className="flex-1 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          value={selectedMilestoneId}
-          onChange={(e) => setSelectedMilestoneId(e.target.value)}
-        >
-          <option value="">Whole Project</option>
-          {projectMilestones.map((milestone) => (
-            <option key={milestone.id} value={milestone.id}>
-              {milestone.title}
-            </option>
-          ))}
-        </select>
+        <div className="relative flex-1">
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="flex w-full items-start justify-between gap-2 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-left text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            aria-haspopup="listbox"
+            aria-expanded={isDropdownOpen}
+          >
+            <span className="min-w-0 flex-1 break-words whitespace-normal">
+              {selectedLabel}
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`mt-1 shrink-0 transition ${isDropdownOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {isDropdownOpen && (
+            <div
+              role="listbox"
+              className="absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-[rgba(15,23,42,0.08)] bg-white/95 p-2 shadow-lg backdrop-blur"
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={!selectedMilestoneId}
+                className="flex w-full items-start gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--panel)]"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setSelectedMilestoneId("")}
+              >
+                <span className="min-w-0 flex-1 break-words whitespace-normal">
+                  Whole Project
+                </span>
+                {!selectedMilestoneId && (
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Active
+                  </span>
+                )}
+              </button>
+              {projectMilestones.map((milestone) => (
+                <button
+                  key={milestone.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedMilestoneId === milestone.id}
+                  className="flex w-full items-start gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--panel)]"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setSelectedMilestoneId(milestone.id)}
+                >
+                  <span className="min-w-0 flex-1 break-words whitespace-normal">
+                    {milestone.title}
+                  </span>
+                  {selectedMilestoneId === milestone.id && (
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                      Active
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <p className="text-xs text-[var(--muted)]">
         Choose a milestone to focus on, or plan across the whole project.

@@ -28,7 +28,7 @@ export default function ProjectSettingsView() {
 
   return (
     <div className="grid gap-6">
-      {projects.length === 0 && <CreateProjectForm />}
+      {!selectedProject && <CreateProjectForm />}
 
       {selectedProject && activeProjectDraft && (
         <section className="grid gap-8 rounded-[28px] bg-white/80 p-8 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)]">
@@ -133,8 +133,8 @@ export default function ProjectSettingsView() {
               <textarea
                 value={activeProjectDraft?.goal || ""}
                 onChange={(event) => updateProjectDraft({ goal: event.target.value })}
-                rows={3}
-                className={tw.input}
+                rows={4}
+                className={`${tw.input} min-h-[120px]`}
               />
             </div>
             <div className="grid gap-3 md:col-span-2">
@@ -150,7 +150,7 @@ export default function ProjectSettingsView() {
             </div>
           </div>
 
-          <div className="mt-4 border-t border-[var(--border-subtle)] pt-8">
+          <div className="mt-3 border-t border-[var(--border-subtle)] pt-5">
             <div className="mb-4">
               <h3 className="text-lg font-medium">Milestones</h3>
               <p className="text-sm text-[var(--muted)]">Edit or delete existing milestones.</p>

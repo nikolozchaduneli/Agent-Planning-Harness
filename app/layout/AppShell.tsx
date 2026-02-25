@@ -16,10 +16,10 @@ import { VoiceRecordingProvider } from "@/app/hooks/useVoiceRecording";
 
 const styles = {
   shell: "relative flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-[15px]",
-  mainBase: "no-scrollbar flex flex-1 flex-col",
+  mainBase: "no-scrollbar flex min-w-0 flex-1 flex-col",
   mainOverflowBrainstorm: "overflow-hidden",
   mainOverflowDefault: "overflow-y-auto",
-  contentWrap: "mx-auto w-full px-8",
+  contentWrap: "mx-auto w-full px-4 sm:px-6 lg:px-8",
 };
 
 export default function AppShell() {
@@ -37,6 +37,20 @@ export default function AppShell() {
       setIsLeftSidebarOpen(false);
     }
   }, [ui.activeView, isFirstRun]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handleChange = () => {
+      if (!mq.matches) {
+        setIsLeftSidebarOpen(false);
+        setShowActivitySidebar(false);
+      }
+    };
+    handleChange();
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
 
   useEffect(() => {
     const handleOpenLeft = () => {
@@ -84,8 +98,8 @@ export default function AppShell() {
               key={ui.activeView}
               className="animate-in fade-in slide-in-from-bottom-1 duration-500 ease-out"
             >
-              {isFirstRun && <OnboardingView />}
-              {!isFirstRun && ui.activeView === "brainstorm" && <BrainstormView />}
+              {isFirstRun && ui.activeView !== "brainstorm" && <OnboardingView />}
+              {ui.activeView === "brainstorm" && <BrainstormView />}
               {!isFirstRun && ui.activeView === "plan" && <PlanView />}
               {!isFirstRun && ui.activeView === "focus" && <FocusView />}
               {!isFirstRun && ui.activeView === "history" && <HistoryView />}

@@ -1,0 +1,17 @@
+Project: ${projectName}
+Goal: ${goal}
+Daily Time Budget: ${budget} minutes
+Focus Notes / Constraints: ${focusNotes}
+
+You are an expert project planner. Break down this project's goal into 3 to 5 logical, sequential milestones.
+
+CRITICAL INSTRUCTIONS:
+- Each milestone title MUST be 8 words or fewer.
+- Write milestones as CONCRETE DELIVERABLES, not process descriptions.
+  GOOD: "Working login page with OAuth"
+  GOOD: "Database schema and seed data"
+  BAD: "Define core requirements and success criteria"
+  BAD: "Draft a scoped implementation plan aligned to constraints"
+- Do NOT echo back the project name, goal text, or focus notes in milestone titles. Use your own words.
+- The milestones MUST respect the "Focus Notes / Constraints" above. Do not include anything outside that scope.
+- If the goal is very vague (e.g. just a single word or generic phrase), produce practical starting milestones like research, prototype, and first deliverable.

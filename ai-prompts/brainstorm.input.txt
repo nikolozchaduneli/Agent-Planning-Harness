@@ -1,0 +1,8 @@
+CURRENT DRAFT: ${JSON_STRINGIFIED_DRAFT}
+
+CONVERSATION HISTORY:
+${ROLE_UPPERCASE}: ${content}
+${ROLE_UPPERCASE}: ${content}
+...
+
+(If no draft: "NO DRAFT YET" instead of CURRENT DRAFT line.)

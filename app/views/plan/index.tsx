@@ -34,6 +34,7 @@ export default function PlanView() {
   const setFocusTask = useAppStore((state) => state.setFocusTask);
   const setView = useAppStore((state) => state.setView);
   const upsertDailyPlan = useAppStore((state) => state.upsertDailyPlan);
+  const setPlanMilestoneForProject = useAppStore((state) => state.setPlanMilestoneForProject);
 
   const selectedProject = projects.find((project) => project.id === ui.selectedProjectId);
   const selectedDate = ui.selectedDate || isoToday();
@@ -42,9 +43,17 @@ export default function PlanView() {
   const [notesFromVoice, setNotesFromVoice] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
   const [manualEstimate, setManualEstimate] = useState(25);
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState("");
+  const [pendingManualTaskScroll, setPendingManualTaskScroll] = useState(false);
   const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
   const sidebarMilestoneSelectRef = useRef(false);
+  const newestTaskRef = useRef<HTMLDivElement | null>(null);
+  const planMilestoneByProject = ui.planMilestoneByProject ?? {};
+  const selectedMilestoneId =
+    selectedProject ? (planMilestoneByProject[selectedProject.id] ?? "") : "";
+  const setSelectedMilestoneId = (value: string) => {
+    if (!selectedProject) return;
+    setPlanMilestoneForProject(selectedProject.id, value);
+  };
 
   const activePlan = useMemo(() => {
     if (!selectedProject) return undefined;
@@ -146,6 +155,16 @@ export default function PlanView() {
   }, [projectMilestones.length]);
 
   useEffect(() => {
+    if (!selectedProject || !selectedMilestoneId) return;
+    const stillExists = projectMilestones.some(
+      (milestone) => milestone.id === selectedMilestoneId,
+    );
+    if (!stillExists) {
+      setPlanMilestoneForProject(selectedProject.id, "");
+    }
+  }, [projectMilestones, selectedMilestoneId, selectedProject, setPlanMilestoneForProject]);
+
+  useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("planning-milestone-change", { detail: selectedMilestoneId }),
     );
@@ -155,7 +174,8 @@ export default function PlanView() {
     const handleSidebarMilestoneSelect = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail ?? "";
       sidebarMilestoneSelectRef.current = true;
-      setSelectedMilestoneId(detail);
+      if (!selectedProject) return;
+      setPlanMilestoneForProject(selectedProject.id, detail);
     };
     window.addEventListener(
       "planning-milestone-select",
@@ -167,7 +187,7 @@ export default function PlanView() {
         handleSidebarMilestoneSelect as EventListener,
       );
     };
-  }, []);
+  }, [selectedProject, setPlanMilestoneForProject]);
 
   useEffect(() => {
     if (!showBudgetOverride && !hasBudgetOverride) return;
@@ -227,6 +247,7 @@ export default function PlanView() {
     addTasks([task]);
     attachTasksToPlan(selectedDate, selectedProject.id, [task.id]);
     setManualTitle("");
+    setPendingManualTaskScroll(true);
   };
 
   const handleRemoveTask = (taskId: string) => {
@@ -289,14 +310,23 @@ export default function PlanView() {
     milestoneDropdownRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedMilestoneId]);
 
+  useEffect(() => {
+    if (!pendingManualTaskScroll || planTasks.length === 0) return;
+    const raf = window.requestAnimationFrame(() => {
+      newestTaskRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      setPendingManualTaskScroll(false);
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [pendingManualTaskScroll, planTasks.length]);
+
   const handleRunAiGeneration = (remainingBudget: number, removeTaskIds: string[]) => {
     runAiGeneration(remainingBudget, removeTaskIds, planNotes);
   };
 
   return (
     <section
-      className={`grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] ${
-        selectedProject ? "pb-24" : ""
+      className={`grid min-w-0 gap-6 rounded-[28px] bg-white/80 p-4 sm:p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] ${
+        selectedProject ? "pb-28" : ""
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -369,7 +399,7 @@ export default function PlanView() {
               <label className="text-sm font-semibold text-[var(--muted)]">
                 Today&apos;s Notes
               </label>
-              <div className="relative flex items-center focus-within:ring-2 focus-within:ring-[var(--ring)] rounded-2xl shadow-[0_0_0_1px_rgba(15,23,42,0.1)] bg-[var(--panel)]">
+              <div className="relative flex min-w-0 items-center rounded-2xl bg-[var(--panel)] shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
                 <textarea
                   value={planNotes}
                   onChange={(event) => setPlanNotes(event.target.value)}
@@ -400,7 +430,7 @@ export default function PlanView() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-1 text-sm font-semibold text-[var(--muted)]">
+          <div className="flex items-center gap-3 pt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
             <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
             <span>Manual Tasks</span>
             <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
@@ -415,13 +445,13 @@ export default function PlanView() {
             selectedMilestoneTitle={selectedMilestone?.title}
           />
 
-          <div className="grid gap-3">
+          <div className="grid min-w-0 gap-3">
             {planTasks.length === 0 && (
               <p className="text-sm text-[var(--muted)]">No tasks yet for this day.</p>
             )}
             {(() => {
               const seenBatches = new Set<string>();
-              return planTasks.map((task) => {
+              return planTasks.map((task, index) => {
                 const batchKey =
                   task.source === "ai"
                     ? task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`
@@ -429,6 +459,7 @@ export default function PlanView() {
                 const showBatchHeader = batchKey ? !seenBatches.has(batchKey) : false;
                 if (showBatchHeader && batchKey) seenBatches.add(batchKey);
                 const batchMeta = batchKey ? aiBatchMeta.get(batchKey) : undefined;
+                const isNewestTask = index === planTasks.length - 1;
 
                 return (
                   <Fragment key={task.id}>
@@ -441,19 +472,21 @@ export default function PlanView() {
                         })}
                       </div>
                     )}
-                    <TaskCard
-                      task={task}
-                      mode="plan"
-                      onStatusChange={updateTaskStatus}
-                      onEstimateChange={updateTaskEstimate}
-                      onTogglePin={toggleTaskPinned}
-                      onUpdateDetails={updateTaskDetails}
-                      onRemove={handleRemoveTask}
-                      onFocus={(id) => {
-                        setFocusTask(id);
-                        setView("focus");
-                      }}
-                    />
+                    <div ref={isNewestTask ? newestTaskRef : undefined}>
+                      <TaskCard
+                        task={task}
+                        mode="plan"
+                        onStatusChange={updateTaskStatus}
+                        onEstimateChange={updateTaskEstimate}
+                        onTogglePin={toggleTaskPinned}
+                        onUpdateDetails={updateTaskDetails}
+                        onRemove={handleRemoveTask}
+                        onFocus={(id) => {
+                          setFocusTask(id);
+                          setView("focus");
+                        }}
+                      />
+                    </div>
                   </Fragment>
                 );
               });

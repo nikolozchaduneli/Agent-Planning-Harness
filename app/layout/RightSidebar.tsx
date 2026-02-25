@@ -7,7 +7,7 @@ import { useShallow } from "zustand/react/shallow";
 
 const styles = {
   wrapper:
-    "relative flex-shrink-0 overflow-visible transition-all duration-500 ease-out",
+    "fixed inset-y-0 right-0 z-30 flex-shrink-0 overflow-visible transition-all duration-500 ease-out md:relative md:inset-auto md:z-auto",
   toggleButton:
     "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   toggleButtonOpen: "shrink-0",

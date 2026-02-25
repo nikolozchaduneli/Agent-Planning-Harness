@@ -1,97 +1,54 @@
-# Testing Issues (New User Lens)
+# Testing Issues
 
-Date: 2026-02-23
-Scope: Code scan only (no fresh manual run)
+Last updated: 2026-02-25
+Scope: Playwright MCP end-to-end regression after fixes + targeted code review.
 
 ## Status
-- The issues below are derived from previous runs or code review and must be revalidated.
-- Run the manual flow in `TESTING.md` to confirm current behavior before acting on any item.
+- The previously confirmed navigation-flow blockers were re-tested and are now resolved.
+- Remaining items below are still open and require dedicated follow-up.
 
-## Priority Legend
-P0 = blocks core flow
-P1 = major confusion / likely to cause user error
-P2 = noticeable friction / polish
-P3 = minor polish
+## Priority legend
+- P0: blocks core flow
+- P1: major functional risk
+- P2: notable UX/behavior inconsistency
+- P3: maintainability/polish risk
 
-## Needs Revalidation (Carryover)
+## Open items
 
-1. P1 - Milestone-scoped AI tasks include out-of-scope milestone content without warning
-   Impact: Users receive tasks from the wrong milestone, undermining trust in scoped generation.
-   Notes: Code now filters tasks mentioning other milestones and can show a scope warning. Verify in UI.
+1. P1 - Settings can persist invalid daily budget values (e.g., `0`)
+- Impact: Zero or unrealistic budgets can degrade planning/generation behavior.
+- Evidence: `CreateProjectForm` clamps budget, but settings save path (`app/hooks/useProjectDrafts.ts`) writes `timeBudgetMinutes` without clamp.
+- Validation: Set budget to `0` in Settings, save, then test Plan budget/generation behavior.
 
-2. P1 - Pinned tasks are not preserved on regenerate
-   Impact: Users lose intentionally pinned tasks when regenerating.
-   Notes: Code now computes pinned vs unpinned and removes only unpinned in the active scope. Verify in UI.
+2. P2 - Deleting milestones can orphan existing task milestone references
+- Impact: Existing AI tasks can lose readable milestone labels and show generic grouping.
+- Evidence: `deleteMilestone` removes milestone only (`lib/store.ts`), while tasks keep `milestoneId`; batch labeling falls back to `"Milestone"` when title is missing (`lib/selectors.ts` -> `selectAiBatchMeta`).
+- Validation: Generate milestone-scoped tasks, delete that milestone, then inspect Plan labels and regenerate behavior.
 
-3. P2 - Pinned-tasks helper text lacks strong visual cue
-   Impact: Users miss that pinned tasks should be preserved.
-   Notes: Helper still appears as small text under Generate Tasks. Verify if it is now clear enough.
+3. P2 - AI milestone proposal may create duplicates
+- Impact: Repeated `AI Propose` actions can clutter milestone lists with near-duplicate entries.
+- Evidence: `handleProposeMilestones` appends all generated milestones with no dedupe check (`app/hooks/useAiGeneration.ts`).
+- Validation: Trigger AI milestone proposal multiple times on the same project and inspect milestone list quality.
 
-4. P2 - Two milestone entry points can feel redundant
-   Impact: Users may be unsure where to add milestones (sidebar input vs plan "Add milestone").
-   Notes: Both entry points still exist. Confirm if this causes confusion.
+4. P3 - `ai-prompts/*` assets are not wired into runtime routes
+- Impact: Prompt edits in these files may drift from actual behavior if contributors assume runtime usage.
+- Evidence: no runtime imports for `ai-prompts/*`; prompts are inlined in `app/api/ai/*` and `app/api/voice/transcribe/route.ts`.
+- Validation: Keep verifying with `rg -n "ai-prompts" app lib` whenever prompt work is proposed.
 
-5. P2 - Activity Trail appears global, not date-scoped
-   Impact: Users may expect Activity to be date-scoped.
-   Notes: Activity is scoped by selected date when "Today" is active. Verify the toggle behavior.
+## Resolved on 2026-02-25 (verified)
 
-6. P2 - Landing header feels like a stray label (tiny and top-left)
-   Impact: First impression is weak; brand/context is unclear.
-   Notes: Header still shows a small welcome label during first run. Verify visually.
+1. P1 - `Start New Project` had no creation path when projects already existed
+- Fix: Settings now renders `CreateProjectForm` whenever no project is selected.
+- Verification: Click `Start New Project` in Settings with an existing project; create form appears.
 
-7. P2 - Landing form card lacks page context
-   Impact: The card floats without grounding.
-   Notes: Onboarding view still renders only Create Project card. Verify need for page-level hero.
+2. P1 - Plan milestone scope reset to `Whole Project` after leaving Plan view
+- Fix: Added persisted per-project milestone scope in store (`ui.planMilestoneByProject`) and wired Plan to use it.
+- Verification: Select milestone scope, navigate to History, return to Plan; scope remains selected.
 
-8. P2 - "Existing projects" visually reads as CTA subheading
-   Impact: Users may interpret the section as part of the CTA instead of a separate list.
-   Notes: In Settings view, the Existing Projects section follows the settings form. Verify spacing.
+3. P1 - Fresh-start `Go to drawing board` failed to enter brainstorm flow
+- Fix: App shell now renders Brainstorm on first-run when `ui.activeView === "brainstorm"`.
+- Verification: In clean first-visit state, click `Go to drawing board`; Drawing Board loads.
 
-9. P2 - Focus outline style is inconsistent and overly dominant
-   Impact: The form feels inconsistent.
-   Notes: Focus styles are defined in Tailwind; verify on inputs in Plan and Create Project.
-
-10. P2 - Time budget input looks like plain text (no minutes or spinner affordance)
-    Impact: Users may not realize it is numeric or that arrows/scroll adjust minutes.
-    Notes: Some inputs now include a "minutes" label. Verify remaining instances.
-
-11. P2 - Three-column layout feels imbalanced on desktop
-    Impact: Center content feels cramped while both sidebars leave empty space.
-    Notes: AppShell still renders both sidebars; verify layout balance.
-
-12. P2 - Top nav has low contrast and feels secondary
-    Impact: Core navigation is easy to miss.
-    Notes: Active tab is accented; verify overall contrast.
-
-13. P3 - Date pill lacks day context and edit affordance
-    Impact: Users may not notice it is editable or what day it represents.
-    Notes: Date is a native date input with a "Date" label; verify clarity.
-
-14. P3 - Task input row feels visually noisy when typing
-    Impact: The input reads like a warning state and is harder to scan.
-    Notes: Inputs use accent focus ring; verify if still too loud.
-
-15. P1 - Newly added task card has low contrast and weak hierarchy
-    Impact: It's easy to miss that a task was added; title doesn't pop.
-    Notes: TaskCard has stronger borders and title sizes; verify visually.
-
-16. P2 - "Focus" vs "Mark done" buttons are too similar
-    Impact: Primary next action is unclear.
-    Notes: Focus button is accented; done is icon-only. Verify clarity.
-
-17. P1 - Alpha-scoped AI task batch includes Beta-scoped tasks
-    Impact: Scope separation breaks trust.
-    Notes: Same as issue #1; verify after AI generation.
-
-## Resolved (from 2026-02-22 run)
-1. P1 - Milestone input requires Enter with no visible affordance
-   Resolution: Visible "Add" button and helper text now present.
-
-2. P1 - "Clear focus" does not clear; it switches to another in-progress task
-   Resolution: "Clear focus" now leaves empty state and does not auto-advance.
-
-3. P1 - Budget gate blocks milestone generation with misleading "pinned" copy
-   Resolution: Budget-full callout now reads "Today's budget is full" with options "Replace unpinned" and "Increase budget."
-
-4. P1 - AI task generation appends without grouping or replace/confirm
-   Resolution: AI task batches are grouped by milestone with clear headings and use replace flow when budget is full.
+4. P2 - Brainstorm suggestion chips required manual Send in some runs
+- Fix: Suggestion chips now submit directly via hook (`submitBrainstormMessage`) instead of synthetic form submit.
+- Verification: Clicking a suggestion posts user message and receives assistant reply immediately.

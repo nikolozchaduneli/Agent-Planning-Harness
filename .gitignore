@@ -37,9 +37,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+#codex 
+.codex
 
 #tmp files
 *.tmp
+
+# transient UI test artifacts
+output/playwright/
 
 # typescript
 *.tsbuildinfo

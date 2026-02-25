@@ -26,7 +26,13 @@ export default function BrainstormView() {
   );
   const isFirstRun = projects.length === 0;
 
-  const { brainstormInput, setBrainstormInput, isBrainstorming, handleBrainstorm } =
+  const {
+    brainstormInput,
+    setBrainstormInput,
+    isBrainstorming,
+    handleBrainstorm,
+    submitBrainstormMessage,
+  } =
     useBrainstorm();
   const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
 
@@ -110,13 +116,7 @@ export default function BrainstormView() {
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => {
-                      setBrainstormInput(opt);
-                      const submitEvent = new Event("submit", { cancelable: true, bubbles: true });
-                      (document.querySelector("#brainstorm-form") as HTMLFormElement)?.dispatchEvent(
-                        submitEvent,
-                      );
-                    }}
+                    onClick={() => submitBrainstormMessage(opt)}
                     className={`group relative flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-2xl border transition-all shadow-sm ${
                       i === 0
                         ? "bg-[var(--accent)] text-white border-[var(--accent)]"

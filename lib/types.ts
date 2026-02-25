@@ -95,6 +95,7 @@ export type AppState = {
     selectedDate: string;
     activeView: AppView;
     focusTaskId?: string;
+    planMilestoneByProject?: Record<string, string>;
     lastTranscript?: string;
     lastVoicePrompt?: string;
   };

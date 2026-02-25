@@ -16,7 +16,7 @@ type TaskCardProps = {
 
 const styles = {
   card:
-    "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-strong)] bg-white/95 p-3 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.6)] min-w-0 overflow-hidden",
+    "flex w-full flex-col gap-3 rounded-2xl border border-[var(--border-strong)] bg-white/95 px-3 py-4 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.6)] min-w-0 overflow-hidden xl:flex-row xl:items-stretch xl:justify-between",
   badge:
     "inline-flex rounded-full bg-[var(--panel)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)] mb-2",
   estimateInput:
@@ -38,11 +38,14 @@ export default function TaskCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task.title);
   const [draftDescription, setDraftDescription] = useState(task.description || "");
 
   const isLong = task.title.length > 80;
-  const titleClass = `text-xl font-semibold text-[var(--ink)] max-w-full break-all ${isLong && !isExpanded ? "line-clamp-2 cursor-text hover:opacity-80" : ""}`;
+  const titleClass = `text-xl font-semibold text-[var(--ink)] max-w-full break-words ${isLong && !isExpanded ? "line-clamp-2 cursor-text hover:opacity-80" : ""}`;
+  const detailsVisibilityClass = `${showDetails ? "block" : "hidden"} md:block`;
+  const detailsVisibilityFlexClass = `${showDetails ? "flex" : "hidden"} md:flex`;
 
   useEffect(() => {
     if (!isEditingTitle) setDraftTitle(task.title);
@@ -79,7 +82,7 @@ export default function TaskCard({
           </svg>
         </button>
       )}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 w-full xl:pr-6">
         <div className="relative flex items-center">
           {hasCornerPin && (
             <button
@@ -131,73 +134,111 @@ export default function TaskCard({
             {task.source === "ai" ? "AI task" : "Manual task"}
           </span>
         </div>
-        <div className="mt-3">
-        {isEditingTitle ? (
-          <input
-            value={draftTitle}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            onBlur={() => {
-              setIsEditingTitle(false);
-              if (draftTitle.trim() && draftTitle !== task.title) {
-                onUpdateDetails?.(task.id, { title: draftTitle.trim() });
-              } else {
-                setDraftTitle(task.title);
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            className="w-full rounded-lg border border-[var(--border-medium)] bg-white/90 px-2 py-1 text-xl font-semibold text-[var(--ink)] shadow-[0_0_0_1px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          />
-        ) : (
-          <h4
-            className={titleClass}
-            onClick={() => {
-              setIsEditingTitle(true);
-              if (isLong) setIsExpanded(true);
-            }}
-            title="Click to edit"
+        <div>
+          {isEditingTitle ? (
+            <input
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              onBlur={() => {
+                setIsEditingTitle(false);
+                if (draftTitle.trim() && draftTitle !== task.title) {
+                  onUpdateDetails?.(task.id, { title: draftTitle.trim() });
+                } else {
+                  setDraftTitle(task.title);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                }
+              }}
+              className="w-full rounded-lg border border-[var(--border-medium)] bg-white/90 px-2 py-1 text-xl font-semibold text-[var(--ink)] shadow-[0_0_0_1px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] xl:max-w-[68ch]"
+            />
+          ) : (
+            <h4
+              className={`${titleClass} xl:max-w-[68ch]`}
+              onClick={() => {
+                setIsEditingTitle(true);
+                if (isLong) setIsExpanded(true);
+              }}
+              title="Click to edit"
+            >
+              {task.title}
+            </h4>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowDetails((prev) => !prev)}
+            className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] transition hover:opacity-80 md:hidden"
           >
-            {task.title}
-          </h4>
-        )}
-        {isEditingDescription ? (
-          <textarea
-            value={draftDescription}
-            onChange={(event) => setDraftDescription(event.target.value)}
-            onBlur={() => {
-              setIsEditingDescription(false);
-              const next = draftDescription.trim();
-              if (next !== (task.description || "")) {
-                onUpdateDetails?.(task.id, { description: next || undefined });
-              } else {
-                setDraftDescription(task.description || "");
-              }
-            }}
-            rows={3}
-            className="mt-2 w-full resize-none rounded-lg border border-[var(--border-medium)] bg-white/90 px-2 py-1 text-sm text-[var(--ink)] shadow-[0_0_0_1px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-            placeholder="Add description"
-          />
-        ) : (
-          <p
-            className={`mt-2 text-sm text-[var(--muted)] max-w-full break-all ${task.description ? "line-clamp-2" : ""} cursor-text`}
-            onClick={() => {
-              setIsEditingDescription(true);
-            }}
-          >
-            {task.description || "Add description"}
-          </p>
-        )}
+            {showDetails ? "Hide details" : "Show details"}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={showDetails ? "rotate-180" : ""}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          <div className={detailsVisibilityClass}>
+            {isEditingDescription ? (
+              <textarea
+                value={draftDescription}
+                onChange={(event) => setDraftDescription(event.target.value)}
+                onBlur={() => {
+                  setIsEditingDescription(false);
+                  const next = draftDescription.trim();
+                  if (next !== (task.description || "")) {
+                    onUpdateDetails?.(task.id, { description: next || undefined });
+                  } else {
+                    setDraftDescription(task.description || "");
+                  }
+                }}
+                rows={3}
+                className="mt-2 w-full resize-none rounded-lg border border-[var(--border-medium)] bg-white/90 px-2 py-1 text-sm text-[var(--ink)] shadow-[0_0_0_1px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] xl:max-w-[68ch]"
+                placeholder="Add description"
+              />
+            ) : (
+              <>
+                {task.description ? (
+                  <p
+                    className="mt-2 max-w-full cursor-text break-words text-sm text-[var(--muted)] line-clamp-2 xl:max-w-[68ch]"
+                    onClick={() => {
+                      setIsEditingDescription(true);
+                      setShowDetails(true);
+                    }}
+                  >
+                    {task.description}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingDescription(true);
+                      setShowDetails(true);
+                    }}
+                    className="mt-2 inline-flex items-center text-xs font-semibold text-[var(--accent)] transition hover:opacity-80"
+                  >
+                    + Add description
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {mode === "plan" && (
-        <div className="flex w-full flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-[var(--muted)]">
+        <div className="flex w-full flex-col gap-2 xl:w-auto xl:flex-col xl:items-end xl:justify-between xl:self-stretch xl:gap-3 xl:pt-9">
+          <div className={`${detailsVisibilityFlexClass} flex-col items-start gap-3 xl:items-end`}>
+            <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
+              <span className="text-[11px] font-medium text-[var(--muted)] md:mt-0">
                 Time
               </span>
               <div className="flex items-center gap-2">
@@ -223,12 +264,11 @@ export default function TaskCard({
                 <span className="text-[11px] font-medium text-[var(--muted)]">min</span>
               </div>
             </div>
-            {task.source === "ai" && <div className="h-9" />}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`${detailsVisibilityFlexClass} items-center justify-end gap-2 pt-2`}>
             <button
               onClick={() => onFocus?.(task.id)}
-              className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white shadow transition hover:-translate-y-0.5"
+              className="whitespace-nowrap rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white shadow transition hover:-translate-y-0.5"
             >
               <span className="inline-flex items-center gap-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -270,7 +310,7 @@ export default function TaskCard({
       )}
 
       {mode === "focus" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={`${detailsVisibilityFlexClass} flex-wrap items-center gap-2`}>
           <span className={`${tw.ghostBtn} text-sm`}>Estimate: {task.estimateMinutes}m</span>
           <span className={`${tw.ghostBtn} text-sm`}>Status: {task.status}</span>
           <button

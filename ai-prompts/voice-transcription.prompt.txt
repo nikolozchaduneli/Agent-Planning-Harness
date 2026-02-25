@@ -1,0 +1,3 @@
+Context: The project is "${projectName}". It is spelled exactly as shown.
+Goal: ${goalSnippet || "none"}.
+Prefer exact capitalization for product names and acronyms.
