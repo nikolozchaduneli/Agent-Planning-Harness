@@ -16,6 +16,46 @@ import MilestoneSelector from "@/app/views/plan/MilestoneSelector";
 import ManualTaskForm from "@/app/views/plan/ManualTaskForm";
 import StickyRegenBar from "@/app/views/plan/StickyRegenBar";
 
+const MIN_PLAN_BUDGET_MINUTES = 30;
+const MAX_PLAN_BUDGET_MINUTES = 720;
+
+const clampPlanBudgetMinutes = (value: number) =>
+  Math.max(MIN_PLAN_BUDGET_MINUTES, Math.min(MAX_PLAN_BUDGET_MINUTES, value || 0));
+
+const createDailyPlan = (
+  projectId: string,
+  date: string,
+  timeBudgetOverrideMinutes?: number,
+): DailyPlan => ({
+  id: crypto.randomUUID(),
+  projectId,
+  date,
+  taskIds: [],
+  timeBudgetOverrideMinutes,
+  createdAt: new Date().toISOString(),
+});
+
+const createManualTask = (
+  projectId: string,
+  title: string,
+  estimateMinutes: number,
+  milestoneId?: string,
+): Task => ({
+  id: crypto.randomUUID(),
+  projectId,
+  title,
+  estimateMinutes,
+  status: "todo",
+  createdAt: new Date().toISOString(),
+  source: "manual",
+  milestoneId: milestoneId || undefined,
+});
+
+const getAiBatchKey = (task: Task) => {
+  if (task.source !== "ai") return null;
+  return task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`;
+};
+
 export default function PlanView() {
   const projects = useAppStore((state) => state.projects);
   const tasks = useAppStore((state) => state.tasks);
@@ -62,7 +102,7 @@ export default function PlanView() {
     );
   }, [dailyPlans, selectedDate, selectedProject]);
 
-  const planTaskIds = activePlan?.taskIds ?? [];
+  const planTaskIds = useMemo(() => activePlan?.taskIds ?? [], [activePlan?.taskIds]);
   const planTasks = useMemo(() => {
     if (!planTaskIds.length) return [];
     const idSet = new Set(planTaskIds);
@@ -88,6 +128,8 @@ export default function PlanView() {
   const {
     isGenerating,
     isGeneratingMilestones,
+    regeneratingTaskIds,
+    newlyGeneratedTaskIds,
     aiError,
     aiScopeWarning,
     aiPrompt,
@@ -98,6 +140,14 @@ export default function PlanView() {
     handleGenerateTasks,
     handleProposeMilestones,
   } = useAiGeneration(selectedProject?.id, selectedMilestoneId);
+  const regeneratingTaskIdSet = useMemo(
+    () => new Set(regeneratingTaskIds),
+    [regeneratingTaskIds],
+  );
+  const newlyGeneratedTaskIdSet = useMemo(
+    () => new Set(newlyGeneratedTaskIds),
+    [newlyGeneratedTaskIds],
+  );
 
   const {
     budgetPulse,
@@ -149,9 +199,11 @@ export default function PlanView() {
   }, [totalPlanned, budget, selectedMilestoneId, regenBudgetMessage, setRegenBudgetMessage]);
 
   useEffect(() => {
-    if (projectMilestones.length > 0) {
+    if (projectMilestones.length === 0) return;
+    const hidePromptTimeout = window.setTimeout(() => {
       setShowMilestonePrompt(false);
-    }
+    }, 0);
+    return () => window.clearTimeout(hidePromptTimeout);
   }, [projectMilestones.length]);
 
   useEffect(() => {
@@ -220,30 +272,18 @@ export default function PlanView() {
   const ensurePlan = () => {
     if (!selectedProject) return;
     if (activePlan) return;
-    const plan: DailyPlan = {
-      id: crypto.randomUUID(),
-      projectId: selectedProject.id,
-      date: selectedDate,
-      taskIds: [],
-      timeBudgetOverrideMinutes: undefined,
-      createdAt: new Date().toISOString(),
-    };
-    upsertDailyPlan(plan);
+    upsertDailyPlan(createDailyPlan(selectedProject.id, selectedDate));
   };
 
   const handleAddManualTask = () => {
     if (!selectedProject || !manualTitle.trim()) return;
     ensurePlan();
-    const task: Task = {
-      id: crypto.randomUUID(),
-      projectId: selectedProject.id,
-      title: manualTitle.trim(),
-      estimateMinutes: manualEstimate,
-      status: "todo",
-      createdAt: new Date().toISOString(),
-      source: "manual",
-      milestoneId: selectedMilestoneId || undefined,
-    };
+    const task = createManualTask(
+      selectedProject.id,
+      manualTitle.trim(),
+      manualEstimate,
+      selectedMilestoneId,
+    );
     addTasks([task]);
     attachTasksToPlan(selectedDate, selectedProject.id, [task.id]);
     setManualTitle("");
@@ -259,18 +299,10 @@ export default function PlanView() {
 
   const handlePlanBudgetOverrideChange = (value: number) => {
     if (!selectedProject) return;
-    ensurePlan();
-    const clamped = Math.max(30, Math.min(720, value || 0));
+    const clamped = clampPlanBudgetMinutes(value);
     const plan: DailyPlan = activePlan
       ? { ...activePlan, timeBudgetOverrideMinutes: clamped }
-      : {
-          id: crypto.randomUUID(),
-          projectId: selectedProject.id,
-          date: selectedDate,
-          taskIds: [],
-          timeBudgetOverrideMinutes: clamped,
-          createdAt: new Date().toISOString(),
-        };
+      : createDailyPlan(selectedProject.id, selectedDate, clamped);
     upsertDailyPlan(plan);
   };
 
@@ -289,6 +321,22 @@ export default function PlanView() {
     () => selectAiBatchMeta(planTasks, milestoneTitleById),
     [planTasks, milestoneTitleById],
   );
+  const planTaskRows = useMemo(() => {
+    const seenBatches = new Set<string>();
+    return planTasks.map((task, index) => {
+      const batchKey = getAiBatchKey(task);
+      const showBatchHeader = !!batchKey && !seenBatches.has(batchKey);
+      if (showBatchHeader && batchKey) {
+        seenBatches.add(batchKey);
+      }
+      return {
+        task,
+        batchMeta: batchKey ? aiBatchMeta.get(batchKey) : undefined,
+        showBatchHeader,
+        isNewestTask: index === planTasks.length - 1,
+      };
+    });
+  }, [aiBatchMeta, planTasks]);
 
   const handleGenerate = async (skipMilestonePrompt?: boolean) => {
     await handleGenerateTasks({
@@ -446,51 +494,61 @@ export default function PlanView() {
           />
 
           <div className="grid min-w-0 gap-3">
-            {planTasks.length === 0 && (
+            {planTasks.length === 0 && !isGenerating && (
               <p className="text-sm text-[var(--muted)]">No tasks yet for this day.</p>
             )}
-            {(() => {
-              const seenBatches = new Set<string>();
-              return planTasks.map((task, index) => {
-                const batchKey =
-                  task.source === "ai"
-                    ? task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`
-                    : null;
-                const showBatchHeader = batchKey ? !seenBatches.has(batchKey) : false;
-                if (showBatchHeader && batchKey) seenBatches.add(batchKey);
-                const batchMeta = batchKey ? aiBatchMeta.get(batchKey) : undefined;
-                const isNewestTask = index === planTasks.length - 1;
-
-                return (
-                  <Fragment key={task.id}>
-                    {showBatchHeader && batchMeta && (
-                      <div className="rounded-full bg-[var(--panel)] px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                        {batchMeta.label} ·{" "}
-                        {new Date(batchMeta.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    )}
-                    <div ref={isNewestTask ? newestTaskRef : undefined}>
-                      <TaskCard
-                        task={task}
-                        mode="plan"
-                        onStatusChange={updateTaskStatus}
-                        onEstimateChange={updateTaskEstimate}
-                        onTogglePin={toggleTaskPinned}
-                        onUpdateDetails={updateTaskDetails}
-                        onRemove={handleRemoveTask}
-                        onFocus={(id) => {
-                          setFocusTask(id);
-                          setView("focus");
-                        }}
-                      />
-                    </div>
-                  </Fragment>
-                );
-              });
-            })()}
+            {planTaskRows.map(({ task, batchMeta, showBatchHeader, isNewestTask }) => (
+              <Fragment key={task.id}>
+                {showBatchHeader && batchMeta && (
+                  <div className="rounded-full bg-[var(--panel)] px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                    {batchMeta.label} ·{" "}
+                    {new Date(batchMeta.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                )}
+                <div ref={isNewestTask ? newestTaskRef : undefined}>
+                  <TaskCard
+                    task={task}
+                    mode="plan"
+                    onStatusChange={updateTaskStatus}
+                    onEstimateChange={updateTaskEstimate}
+                    onTogglePin={toggleTaskPinned}
+                    onUpdateDetails={updateTaskDetails}
+                    onRemove={handleRemoveTask}
+                    onFocus={(id) => {
+                      setFocusTask(id);
+                      setView("focus");
+                    }}
+                    isRegenerating={regeneratingTaskIdSet.has(task.id)}
+                    isNewlyGenerated={newlyGeneratedTaskIdSet.has(task.id)}
+                  />
+                </div>
+              </Fragment>
+            ))}
+            {isGenerating && (
+              <>
+                <div className="flex items-center gap-2 rounded-2xl border border-dashed border-sky-300/80 bg-sky-50/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                  <span
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-sky-300 border-t-sky-600"
+                    aria-hidden="true"
+                  />
+                  Generating tasks for this list...
+                </div>
+                {Array.from({ length: planTasks.length === 0 ? 3 : 2 }).map((_, index) => (
+                  <div
+                    key={`pending-generated-task-${index}`}
+                    className="grid gap-2 rounded-2xl border border-dashed border-sky-300/75 bg-white/85 px-4 py-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.5)] animate-pulse"
+                    aria-hidden="true"
+                  >
+                    <div className="h-2 w-1/3 rounded-full bg-slate-300/80" />
+                    <div className="h-2 w-11/12 rounded-full bg-slate-300/80" />
+                    <div className="h-2 w-2/3 rounded-full bg-slate-300/80" />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

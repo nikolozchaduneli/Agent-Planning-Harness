@@ -8,7 +8,6 @@ import type {
   TaskStatus,
   Milestone,
   Activity,
-  BrainstormMessage,
   BrainstormDraft,
 } from "./types";
 
@@ -210,6 +209,29 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
     set((state) => {
       const index = state.dailyPlans.findIndex((item) => item.id === plan.id);
       if (index === -1) {
+        const sameScopeIndex = state.dailyPlans.findIndex(
+          (item) => item.date === plan.date && item.projectId === plan.projectId,
+        );
+        if (sameScopeIndex !== -1) {
+          const existing = state.dailyPlans[sameScopeIndex];
+          const merged: DailyPlan = {
+            ...existing,
+            ...plan,
+            id: existing.id,
+            createdAt: existing.createdAt,
+            taskIds:
+              plan.taskIds.length > 0
+                ? Array.from(new Set([...existing.taskIds, ...plan.taskIds]))
+                : existing.taskIds,
+            timeBudgetOverrideMinutes:
+              typeof plan.timeBudgetOverrideMinutes === "number"
+                ? plan.timeBudgetOverrideMinutes
+                : existing.timeBudgetOverrideMinutes,
+          };
+          const next = [...state.dailyPlans];
+          next[sameScopeIndex] = merged;
+          return { dailyPlans: next };
+        }
         return { dailyPlans: [...state.dailyPlans, plan] };
       }
       const next = [...state.dailyPlans];

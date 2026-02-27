@@ -33,9 +33,11 @@ export default function AppShell() {
 
   useEffect(() => {
     if (isFirstRun) return;
-    if (ui.activeView === "brainstorm") {
+    if (ui.activeView !== "brainstorm") return;
+    const closeSidebarTimeout = setTimeout(() => {
       setIsLeftSidebarOpen(false);
-    }
+    }, 0);
+    return () => clearTimeout(closeSidebarTimeout);
   }, [ui.activeView, isFirstRun]);
 
   useEffect(() => {

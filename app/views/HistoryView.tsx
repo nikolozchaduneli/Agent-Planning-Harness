@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/lib/store";
 import { buildProjectHistory } from "@/lib/selectors";
@@ -22,13 +22,13 @@ export default function HistoryView() {
     [projects, tasks],
   );
 
-  const baseDateRef = useRef(new Date().toISOString().slice(0, 10));
+  const baseDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const projectHistory = useMemo(
     () =>
       selectedProject
-        ? buildProjectHistory(tasks, selectedProject.id, 10, baseDateRef.current)
+        ? buildProjectHistory(tasks, selectedProject.id, 10, baseDate)
         : [],
-    [selectedProject, tasks],
+    [selectedProject, tasks, baseDate],
   );
 
   return (

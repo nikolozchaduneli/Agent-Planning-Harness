@@ -1,6 +1,6 @@
 # Testing Issues
 
-Last updated: 2026-02-25
+Last updated: 2026-02-27
 Scope: Playwright MCP end-to-end regression after fixes + targeted code review.
 
 ## Status
@@ -15,22 +15,17 @@ Scope: Playwright MCP end-to-end regression after fixes + targeted code review.
 
 ## Open items
 
-1. P1 - Settings can persist invalid daily budget values (e.g., `0`)
-- Impact: Zero or unrealistic budgets can degrade planning/generation behavior.
-- Evidence: `CreateProjectForm` clamps budget, but settings save path (`app/hooks/useProjectDrafts.ts`) writes `timeBudgetMinutes` without clamp.
-- Validation: Set budget to `0` in Settings, save, then test Plan budget/generation behavior.
-
-2. P2 - Deleting milestones can orphan existing task milestone references
+1. P2 - Deleting milestones can orphan existing task milestone references
 - Impact: Existing AI tasks can lose readable milestone labels and show generic grouping.
 - Evidence: `deleteMilestone` removes milestone only (`lib/store.ts`), while tasks keep `milestoneId`; batch labeling falls back to `"Milestone"` when title is missing (`lib/selectors.ts` -> `selectAiBatchMeta`).
 - Validation: Generate milestone-scoped tasks, delete that milestone, then inspect Plan labels and regenerate behavior.
 
-3. P2 - AI milestone proposal may create duplicates
+2. P2 - AI milestone proposal may create duplicates
 - Impact: Repeated `AI Propose` actions can clutter milestone lists with near-duplicate entries.
 - Evidence: `handleProposeMilestones` appends all generated milestones with no dedupe check (`app/hooks/useAiGeneration.ts`).
 - Validation: Trigger AI milestone proposal multiple times on the same project and inspect milestone list quality.
 
-4. P3 - `ai-prompts/*` assets are not wired into runtime routes
+3. P3 - `ai-prompts/*` assets are not wired into runtime routes
 - Impact: Prompt edits in these files may drift from actual behavior if contributors assume runtime usage.
 - Evidence: no runtime imports for `ai-prompts/*`; prompts are inlined in `app/api/ai/*` and `app/api/voice/transcribe/route.ts`.
 - Validation: Keep verifying with `rg -n "ai-prompts" app lib` whenever prompt work is proposed.
@@ -52,3 +47,11 @@ Scope: Playwright MCP end-to-end regression after fixes + targeted code review.
 4. P2 - Brainstorm suggestion chips required manual Send in some runs
 - Fix: Suggestion chips now submit directly via hook (`submitBrainstormMessage`) instead of synthetic form submit.
 - Verification: Clicking a suggestion posts user message and receives assistant reply immediately.
+
+5. P1 - Settings could persist invalid daily budget values (e.g., `0`)
+- Fix: Settings save now clamps budget to `15-720` before persisting and syncs draft value to the clamped result (`app/hooks/useProjectDrafts.ts`).
+- Verification: Save `0` (or `9999`) in Settings; re-open project and confirm stored budget is clamped and generation endpoints receive a valid positive budget.
+
+6. P1 - Budget-full regenerate path could show a dead-end replacement prompt
+- Fix: AI generation now classifies no-append/no-replace states as `budgetFull`, and prompt UI consistently shows budget guidance instead of replacement actions (`app/hooks/useAiGeneration.ts`, `app/views/plan/MilestoneSelector.tsx`).
+- Verification: Fill budget, pick a milestone scope with no replacement room, click Generate, and confirm `Adjust today's time` appears without a disabled replace-only prompt.

@@ -22,8 +22,8 @@ type RightSidebarProps = {
 
 export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
   const [showAllActivity, setShowAllActivity] = useState(false);
-  const { ui, projects, activities } = useAppStore(
-    useShallow((state) => ({ ui: state.ui, projects: state.projects, activities: state.activities })),
+  const { ui, projects } = useAppStore(
+    useShallow((state) => ({ ui: state.ui, projects: state.projects })),
   );
 
   const selectedProject = projects.find((project) => project.id === ui.selectedProjectId);

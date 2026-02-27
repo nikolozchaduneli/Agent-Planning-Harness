@@ -89,7 +89,9 @@ Flow list:
 - preserves pinned AI tasks
 - replaces only unpinned tasks when needed
 - supports append when budget allows
-- shows prompt when budget is full (`aiPrompt` modes: `regenerate` / `budgetFull`)
+- whole-project generation classifies generated tasks per milestone when milestone data is available
+- when selected milestone has no replacement room but other milestones do, offers cross-milestone replacement (remove unpinned AI `todo` tasks outside scope, then generate in selected scope)
+- shows prompt when budget is full (`aiPrompt` modes: `regenerate` / `crossReplace` / `budgetFull`)
 - Backend validation/fallback (`app/api/ai/generate-tasks/route.ts`):
 - validates input/output with Zod
 - uses Azure Responses API when configured

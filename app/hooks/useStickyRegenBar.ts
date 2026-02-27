@@ -19,10 +19,7 @@ export default function useStickyRegenBar(
   const focusHighlightTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (activeView !== "plan") {
-      setShowStickyRegen(false);
-      return;
-    }
+    if (activeView !== "plan") return;
     if (!milestoneDropdownRef.current) return;
 
     const target = milestoneDropdownRef.current;
@@ -40,18 +37,25 @@ export default function useStickyRegenBar(
     if (!shouldScrollToRegenMessage) return;
     if (aiPromptRef.current) {
       aiPromptRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      setFocusHighlight("aiPrompt");
-      setShouldScrollToRegenMessage(false);
-      return;
+      const aiPromptTimeout = setTimeout(() => {
+        setFocusHighlight("aiPrompt");
+        setShouldScrollToRegenMessage(false);
+      }, 0);
+      return () => clearTimeout(aiPromptTimeout);
     }
     if (regenMessageRef.current) {
       regenMessageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      setFocusHighlight("regenMessage");
-      setShouldScrollToRegenMessage(false);
-      return;
+      const regenTimeout = setTimeout(() => {
+        setFocusHighlight("regenMessage");
+        setShouldScrollToRegenMessage(false);
+      }, 0);
+      return () => clearTimeout(regenTimeout);
     }
     if (!aiPromptActive && !regenMessageActive) {
-      setShouldScrollToRegenMessage(false);
+      const clearTimeoutId = setTimeout(() => {
+        setShouldScrollToRegenMessage(false);
+      }, 0);
+      return () => clearTimeout(clearTimeoutId);
     }
   }, [shouldScrollToRegenMessage, aiPromptActive, regenMessageActive]);
 
@@ -64,14 +68,10 @@ export default function useStickyRegenBar(
     };
   }, [focusHighlight]);
 
-  useEffect(() => {
-    if (!hasPlanTasks && showStickyRegen) {
-      setShowStickyRegen(false);
-    }
-  }, [hasPlanTasks, showStickyRegen]);
+  const shouldShowStickyRegen = activeView === "plan" && hasPlanTasks && showStickyRegen;
 
   return {
-    showStickyRegen,
+    showStickyRegen: shouldShowStickyRegen,
     shouldScrollToRegenMessage,
     setShouldScrollToRegenMessage,
     focusHighlight,

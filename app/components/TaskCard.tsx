@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useState } from "react";
 import type { Task, TaskStatus } from "@/lib/types";
 import { tw } from "@/lib/constants";
 import { blockNonNumericKey, blockNonNumericPaste } from "@/lib/forms";
@@ -12,6 +12,8 @@ type TaskCardProps = {
   onFocus?: (id: string) => void;
   onUpdateDetails?: (id: string, data: Partial<Pick<Task, "title" | "description">>) => void;
   onRemove?: (id: string) => void;
+  isRegenerating?: boolean;
+  isNewlyGenerated?: boolean;
 };
 
 const styles = {
@@ -34,6 +36,8 @@ export default function TaskCard({
   onFocus,
   onUpdateDetails,
   onRemove,
+  isRegenerating = false,
+  isNewlyGenerated = false,
 }: TaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -47,19 +51,25 @@ export default function TaskCard({
   const detailsVisibilityClass = `${showDetails ? "block" : "hidden"} md:block`;
   const detailsVisibilityFlexClass = `${showDetails ? "flex" : "hidden"} md:flex`;
 
-  useEffect(() => {
-    if (!isEditingTitle) setDraftTitle(task.title);
-  }, [task.title, isEditingTitle]);
-
-  useEffect(() => {
-    if (!isEditingDescription) setDraftDescription(task.description || "");
-  }, [task.description, isEditingDescription]);
-
   const hasCornerPin = task.source === "ai" && onTogglePin;
+  const animationClass = isRegenerating
+    ? "task-regenerating"
+    : isNewlyGenerated
+      ? "task-generated-enter"
+      : "";
 
   return (
-    <div className={`${styles.card} relative`}>
-      {mode === "plan" && onRemove && (
+    <div
+      className={`${styles.card} relative ${animationClass}`}
+      aria-busy={isRegenerating}
+    >
+      {isRegenerating && (
+        <div className="absolute right-3 top-3 inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/35 bg-white/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--accent)]">
+          <span className="regen-dot" aria-hidden="true" />
+          Regenerating
+        </div>
+      )}
+      {mode === "plan" && onRemove && !isRegenerating && (
         <button
           type="button"
           onClick={() => onRemove(task.id)}
@@ -88,13 +98,14 @@ export default function TaskCard({
             <button
               type="button"
               onClick={() => onTogglePin?.(task.id)}
+              disabled={isRegenerating}
               title={task.pinned ? "Unpin task" : "Pin task"}
               aria-label={task.pinned ? "Unpin task" : "Pin task"}
               className={`absolute left-0 top-1/2 -translate-y-[60%] flex h-7 w-7 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-[65%] ${
                 task.pinned
                   ? "pin-indicator border-[var(--accent)] bg-white text-[var(--accent)] shadow-[0_6px_14px_-8px_rgba(249,115,22,0.9)]"
                   : "border-[var(--border-medium)] bg-white text-[var(--accent)]"
-              }`}
+              } ${isRegenerating ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {task.pinned ? (
                 <svg
@@ -158,6 +169,8 @@ export default function TaskCard({
             <h4
               className={`${titleClass} xl:max-w-[68ch]`}
               onClick={() => {
+                if (isRegenerating) return;
+                setDraftTitle(task.title);
                 setIsEditingTitle(true);
                 if (isLong) setIsExpanded(true);
               }}
@@ -169,6 +182,7 @@ export default function TaskCard({
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
+            disabled={isRegenerating}
             className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] transition hover:opacity-80 md:hidden"
           >
             {showDetails ? "Hide details" : "Show details"}
@@ -210,6 +224,7 @@ export default function TaskCard({
                   <p
                     className="mt-2 max-w-full cursor-text break-words text-sm text-[var(--muted)] line-clamp-2 xl:max-w-[68ch]"
                     onClick={() => {
+                      setDraftDescription(task.description || "");
                       setIsEditingDescription(true);
                       setShowDetails(true);
                     }}
@@ -220,6 +235,7 @@ export default function TaskCard({
                   <button
                     type="button"
                     onClick={() => {
+                      setDraftDescription(task.description || "");
                       setIsEditingDescription(true);
                       setShowDetails(true);
                     }}
@@ -253,14 +269,15 @@ export default function TaskCard({
                   onFocus={(e) => e.target.select()}
                   onKeyDown={blockNonNumericKey}
                   onPaste={blockNonNumericPaste}
-                  onChange={(event) =>
-                    onEstimateChange?.(
-                      task.id,
-                      event.target.value === "" ? 0 : Number(event.target.value),
-                    )
-                  }
-                  className={styles.estimateInput}
-                />
+                    onChange={(event) =>
+                      onEstimateChange?.(
+                        task.id,
+                        event.target.value === "" ? 0 : Number(event.target.value),
+                      )
+                    }
+                    disabled={isRegenerating}
+                    className={styles.estimateInput}
+                  />
                 <span className="text-[11px] font-medium text-[var(--muted)]">min</span>
               </div>
             </div>
@@ -268,6 +285,7 @@ export default function TaskCard({
           <div className={`${detailsVisibilityFlexClass} items-center justify-end gap-2 pt-2`}>
             <button
               onClick={() => onFocus?.(task.id)}
+              disabled={isRegenerating}
               className="whitespace-nowrap rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white shadow transition hover:-translate-y-0.5"
             >
               <span className="inline-flex items-center gap-1">
@@ -283,6 +301,7 @@ export default function TaskCard({
               onClick={() =>
                 onStatusChange(task.id, task.status === "done" ? "todo" : "done")
               }
+              disabled={isRegenerating}
               aria-label={task.status === "done" ? "Mark as todo" : "Mark done"}
               title={task.status === "done" ? "Mark as todo" : "Mark done"}
               className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition hover:-translate-y-0.5 ${
@@ -330,3 +349,4 @@ export default function TaskCard({
     </div>
   );
 }
+

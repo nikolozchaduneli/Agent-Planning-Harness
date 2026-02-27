@@ -2,7 +2,7 @@
 import type { Milestone } from "@/lib/types";
 
 type AiPromptState = {
-  mode: "regenerate" | "budgetFull";
+  mode: "regenerate" | "budgetFull" | "crossReplace";
   pinnedCount: number;
   unpinnedCount: number;
   remainingAppend: number;
@@ -82,10 +82,6 @@ export default function MilestoneSelector({
     };
   }, [isDropdownOpen, milestoneDropdownRef]);
 
-  useEffect(() => {
-    if (isDropdownOpen) setIsDropdownOpen(false);
-  }, [selectedMilestoneId]);
-
   return (
     <div ref={milestoneDropdownRef} className="flex flex-col gap-2 pb-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -127,7 +123,10 @@ export default function MilestoneSelector({
                 aria-selected={!selectedMilestoneId}
                 className="flex w-full items-start gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--panel)]"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => setSelectedMilestoneId("")}
+                onClick={() => {
+                  setSelectedMilestoneId("");
+                  setIsDropdownOpen(false);
+                }}
               >
                 <span className="min-w-0 flex-1 break-words whitespace-normal">
                   Whole Project
@@ -146,7 +145,10 @@ export default function MilestoneSelector({
                   aria-selected={selectedMilestoneId === milestone.id}
                   className="flex w-full items-start gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--panel)]"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setSelectedMilestoneId(milestone.id)}
+                  onClick={() => {
+                    setSelectedMilestoneId(milestone.id);
+                    setIsDropdownOpen(false);
+                  }}
                 >
                   <span className="min-w-0 flex-1 break-words whitespace-normal">
                     {milestone.title}
@@ -263,25 +265,49 @@ export default function MilestoneSelector({
           }`}
         >
           <p className="text-[var(--ink)] font-semibold">
-            You&apos;re about to replace one of your milestone tasks by another&apos;s.
+            {aiPrompt.mode === "budgetFull"
+              ? "Today's plan is full. Extend today's time to continue."
+              : aiPrompt.mode === "crossReplace"
+                ? "Today's plan is full. Extend today's time or replace unpinned tasks from other milestones."
+              : "Replace unpinned tasks in this milestone?"}
           </p>
           <p className="mt-1 text-[var(--muted)]">
-            Pin any tasks you want to preserve before continuing.
+            {aiPrompt.mode === "budgetFull"
+              ? "No replaceable unpinned tasks are available in this scope."
+              : aiPrompt.mode === "crossReplace"
+                ? "We'll remove unpinned AI to-do tasks in other milestones and generate tasks for this milestone."
+              : "We'll remove unpinned AI to-do tasks in this milestone before generating new ones. Pin any tasks you want to preserve first."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={aiPrompt.unpinnedCount === 0 || aiPrompt.remainingReplace <= 0}
-              onClick={() => {
-                const next = aiPrompt;
-                setAiPrompt(null);
-                onRunAiGeneration(next.remainingReplace, next.removeTaskIds);
-              }}
-              className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
-            >
-              Replace Unpinned Tasks
-            </button>
-            {aiPrompt.mode === "budgetFull" && (
+            {aiPrompt.mode === "regenerate" && (
+              <button
+                type="button"
+                disabled={aiPrompt.unpinnedCount === 0 || aiPrompt.remainingReplace <= 0}
+                onClick={() => {
+                  const next = aiPrompt;
+                  setAiPrompt(null);
+                  onRunAiGeneration(next.remainingReplace, next.removeTaskIds);
+                }}
+                className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                Replace Unpinned Tasks
+              </button>
+            )}
+            {aiPrompt.mode === "crossReplace" && (
+              <button
+                type="button"
+                disabled={aiPrompt.unpinnedCount === 0 || aiPrompt.remainingReplace <= 0}
+                onClick={() => {
+                  const next = aiPrompt;
+                  setAiPrompt(null);
+                  onRunAiGeneration(next.remainingReplace, next.removeTaskIds);
+                }}
+                className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                Replace Unpinned From Other Milestones
+              </button>
+            )}
+            {(aiPrompt.mode === "budgetFull" || aiPrompt.mode === "crossReplace") && (
               <button
                 type="button"
                 onClick={() => {
@@ -291,7 +317,7 @@ export default function MilestoneSelector({
                 }}
                 className="rounded-full border border-[rgba(15,23,42,0.15)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:-translate-y-0.5 disabled:opacity-50"
               >
-                Adjust today&apos;s time
+                Extend today&apos;s time
               </button>
             )}
             <button

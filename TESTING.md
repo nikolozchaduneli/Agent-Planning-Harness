@@ -41,7 +41,8 @@ Scope: Manual QA checklist aligned to current UI and code behavior.
 2. Generate tasks and confirm AI batch header matches Milestone A.
 3. Switch to Milestone B and generate again; confirm header and task scope are B-oriented.
 4. Confirm `scopeWarning` appears when off-scope tasks are filtered.
-5. In a project with zero milestones, click Generate and verify prompt options:
+5. Switch selector to `Whole Project`, generate, and confirm generated AI tasks are labeled/scoped across milestones (not only `Whole Project`) when milestones exist.
+6. In a project with zero milestones, click Generate and verify prompt options:
 - Add milestone
 - AI propose milestones
 - Continue with Whole Project
@@ -53,8 +54,13 @@ Scope: Manual QA checklist aligned to current UI and code behavior.
 4. Fill/overfill budget and verify:
 - budget bar and over-budget message update
 - budget-full prompt appears when append is impossible
-- `Adjust today's time` opens override controls
-5. If pinned scoped tasks consume full budget, verify pinned-budget warning message appears.
+- `Extend today's time` opens override controls
+5. Cross-milestone replacement check:
+- Fill budget with unpinned AI `todo` tasks in Milestones A/B.
+- Switch to Milestone C (with no scoped replaceable tasks) and click Generate.
+- Verify prompt offers replacing unpinned tasks from other milestones.
+- Confirm action removes eligible tasks from A/B and generates tasks in C.
+6. If pinned scoped tasks consume full budget, verify pinned-budget warning message appears.
 
 ## 5. Manual task and task-card controls
 1. Add manual task with dictation mic and verify transcript fills title.

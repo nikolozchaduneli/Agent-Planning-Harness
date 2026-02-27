@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Project } from "@/lib/types";
 import { useAppStore } from "@/lib/store";
 
@@ -16,12 +16,23 @@ type DraftPatch = {
   constraints?: { timeBudgetMinutes?: number; focusNotes?: string };
 };
 
+const MIN_PROJECT_BUDGET_MINUTES = 15;
+const MAX_PROJECT_BUDGET_MINUTES = 720;
+
+const clampProjectBudgetMinutes = (value: number, fallback: number) => {
+  if (!Number.isFinite(value)) return fallback;
+  const rounded = Math.round(value);
+  return Math.max(
+    MIN_PROJECT_BUDGET_MINUTES,
+    Math.min(MAX_PROJECT_BUDGET_MINUTES, rounded),
+  );
+};
+
 export default function useProjectDrafts(selectedProject: Project | undefined) {
   const updateProject = useAppStore((state) => state.updateProject);
 
   const [projectDrafts, setProjectDrafts] = useState<Record<string, Draft>>({});
   const [dirtyProjectIds, setDirtyProjectIds] = useState<Record<string, boolean>>({});
-  const prevProjectIdRef = useRef<string | undefined>(undefined);
 
   const buildProjectDraft = (project: Project | undefined): Draft => ({
     name: project?.name || "",
@@ -41,19 +52,6 @@ export default function useProjectDrafts(selectedProject: Project | undefined) {
     () => Object.values(dirtyProjectIds).some(Boolean),
     [dirtyProjectIds],
   );
-
-  useEffect(() => {
-    if (!selectedProject) return;
-    const projectId = selectedProject.id;
-    if (prevProjectIdRef.current === projectId) return;
-    prevProjectIdRef.current = projectId;
-
-    const freshDraft = buildProjectDraft(selectedProject);
-    setProjectDrafts((prev) => ({
-      ...prev,
-      [projectId]: freshDraft,
-    }));
-  }, [selectedProject]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -82,14 +80,35 @@ export default function useProjectDrafts(selectedProject: Project | undefined) {
 
   const save = () => {
     if (!selectedProject || !activeProjectDraft) return;
+    const currentBudget = clampProjectBudgetMinutes(
+      selectedProject.constraints.timeBudgetMinutes,
+      MIN_PROJECT_BUDGET_MINUTES,
+    );
+    const nextBudget = clampProjectBudgetMinutes(
+      activeProjectDraft.constraints.timeBudgetMinutes,
+      currentBudget,
+    );
+    const trimmedFocusNotes = activeProjectDraft.constraints.focusNotes?.trim() || undefined;
+
     updateProject(selectedProject.id, {
       name: activeProjectDraft.name.trim() || selectedProject.name,
       goal: activeProjectDraft.goal.trim() || selectedProject.goal,
       constraints: {
-        timeBudgetMinutes: activeProjectDraft.constraints.timeBudgetMinutes,
-        focusNotes: activeProjectDraft.constraints.focusNotes?.trim() || undefined,
+        timeBudgetMinutes: nextBudget,
+        focusNotes: trimmedFocusNotes,
       },
     });
+    setProjectDrafts((prev) => ({
+      ...prev,
+      [selectedProject.id]: {
+        ...activeProjectDraft,
+        constraints: {
+          ...activeProjectDraft.constraints,
+          timeBudgetMinutes: nextBudget,
+          focusNotes: trimmedFocusNotes,
+        },
+      },
+    }));
     setDirtyProjectIds((prev) => ({ ...prev, [selectedProject.id]: false }));
   };
 
