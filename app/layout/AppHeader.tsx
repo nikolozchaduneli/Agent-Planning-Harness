@@ -1,25 +1,36 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import useVoiceRecording from "@/app/hooks/useVoiceRecording";
 
 const styles = {
   header:
-    "sticky top-0 z-10 flex flex-nowrap items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[#f8fafc]/90 pl-8 pr-3 py-4 backdrop-blur-md",
+    "sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] bg-[#f8fafc]/90 px-3 py-3 backdrop-blur-md sm:gap-4 sm:py-4 sm:pl-8 sm:pr-3",
   navButton:
-    "rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5",
+    "shrink-0 snap-start rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 sm:px-5 sm:py-2 sm:text-xs sm:tracking-[0.2em]",
   dateInput:
     "rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
 };
 
 type AppHeaderProps = {
+  leftSidebarOpen: boolean;
   activitySidebarOpen: boolean;
+  sidebarTransitioning: boolean;
   onToggleActivity: () => void;
 };
 
-export default function AppHeader({ activitySidebarOpen, onToggleActivity }: AppHeaderProps) {
+const RECORD_COMPACT_RELEASE_BUFFER_PX = 96;
+const RECORD_EXPAND_SETTLE_MS = 70;
+const RECORD_EXPAND_REQUIRED_SLACK_PX = 64;
+
+export default function AppHeader({
+  leftSidebarOpen,
+  activitySidebarOpen,
+  sidebarTransitioning,
+  onToggleActivity,
+}: AppHeaderProps) {
   const { ui, projects, setView, setDate } = useAppStore(
     useShallow((state) => ({
       ui: state.ui,
@@ -35,6 +46,15 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
     useVoiceRecording();
 
   const [globalTranscript, setGlobalTranscript] = useState<string | null>(null);
+  const [isRecordCompact, setIsRecordCompact] = useState(false);
+  const compactReleaseWidthRef = useRef<number | null>(null);
+  const expandTimerRef = useRef<number | null>(null);
+  const forceCompactRafRef = useRef<number | null>(null);
+  const prevLeftSidebarOpenRef = useRef(leftSidebarOpen);
+  const prevActivitySidebarOpenRef = useRef(activitySidebarOpen);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const navGroupRef = useRef<HTMLDivElement | null>(null);
+  const controlsGroupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!globalTranscript) return;
@@ -73,15 +93,191 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
     [],
   );
 
+  const queueForceCompact = () => {
+    if (expandTimerRef.current !== null) {
+      window.clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+    compactReleaseWidthRef.current = null;
+    if (forceCompactRafRef.current !== null) {
+      window.cancelAnimationFrame(forceCompactRafRef.current);
+      forceCompactRafRef.current = null;
+    }
+    forceCompactRafRef.current = window.requestAnimationFrame(() => {
+      setIsRecordCompact(true);
+      forceCompactRafRef.current = null;
+    });
+  };
+
+  useEffect(() => {
+    const wasOpen = prevLeftSidebarOpenRef.current;
+    prevLeftSidebarOpenRef.current = leftSidebarOpen;
+    const openingLeftSidebar = !wasOpen && leftSidebarOpen;
+    if (!openingLeftSidebar || !activitySidebarOpen) return;
+
+    queueForceCompact();
+    return () => {
+      if (forceCompactRafRef.current !== null) {
+        window.cancelAnimationFrame(forceCompactRafRef.current);
+        forceCompactRafRef.current = null;
+      }
+    };
+  }, [activitySidebarOpen, leftSidebarOpen]);
+
+  useEffect(() => {
+    const wasOpen = prevActivitySidebarOpenRef.current;
+    prevActivitySidebarOpenRef.current = activitySidebarOpen;
+    const openingActivitySidebar = !wasOpen && activitySidebarOpen;
+    if (!openingActivitySidebar) return;
+
+    queueForceCompact();
+    return () => {
+      if (forceCompactRafRef.current !== null) {
+        window.cancelAnimationFrame(forceCompactRafRef.current);
+        forceCompactRafRef.current = null;
+      }
+    };
+  }, [activitySidebarOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const clearExpandTimer = () => {
+      if (expandTimerRef.current !== null) {
+        window.clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    };
+
+    const getHeaderWidth = () => {
+      const header = headerRef.current;
+      if (!header) return window.innerWidth;
+      return header.getBoundingClientRect().width;
+    };
+
+    const canExpand = () => {
+      if (sidebarTransitioning) return false;
+
+      const navGroup = navGroupRef.current;
+      const controlsGroup = controlsGroupRef.current;
+      const header = headerRef.current;
+      if (!navGroup || !controlsGroup || !header) return false;
+
+      const sameRow = Math.abs(navGroup.offsetTop - controlsGroup.offsetTop) <= 12;
+      if (!sameRow) return false;
+
+      const releaseWidth = compactReleaseWidthRef.current;
+      const headerWidth = getHeaderWidth();
+      if (releaseWidth !== null && headerWidth < releaseWidth) return false;
+
+      const headerStyles = window.getComputedStyle(header);
+      const headerGap =
+        Number.parseFloat(headerStyles.columnGap || headerStyles.gap || "0") || 0;
+      const navWidth = navGroup.getBoundingClientRect().width;
+      const controlsWidth = controlsGroup.getBoundingClientRect().width;
+      const requiredWidth =
+        navWidth +
+        controlsWidth +
+        headerGap +
+        (isRecordCompact ? RECORD_EXPAND_REQUIRED_SLACK_PX : 0);
+      if (requiredWidth > headerWidth) return false;
+
+      return true;
+    };
+
+    const scheduleExpandCheck = () => {
+      if (expandTimerRef.current !== null) return;
+      expandTimerRef.current = window.setTimeout(() => {
+        expandTimerRef.current = null;
+        if (!canExpand()) return;
+        compactReleaseWidthRef.current = null;
+        setIsRecordCompact(false);
+      }, RECORD_EXPAND_SETTLE_MS);
+    };
+
+    const measureLayout = () => {
+      const navGroup = navGroupRef.current;
+      const controlsGroup = controlsGroupRef.current;
+      if (!navGroup || !controlsGroup) return;
+
+      const sameRow = Math.abs(navGroup.offsetTop - controlsGroup.offsetTop) <= 12;
+      const headerWidth = getHeaderWidth();
+      setIsRecordCompact((prev) => {
+        if (!sameRow) {
+          clearExpandTimer();
+          compactReleaseWidthRef.current =
+            headerWidth + RECORD_COMPACT_RELEASE_BUFFER_PX;
+          return prev ? prev : true;
+        }
+
+        if (!prev) {
+          clearExpandTimer();
+          compactReleaseWidthRef.current = null;
+          return prev;
+        }
+
+        const releaseWidth = compactReleaseWidthRef.current;
+        if (releaseWidth !== null && headerWidth < releaseWidth) {
+          clearExpandTimer();
+          return prev;
+        }
+        if (sidebarTransitioning) {
+          clearExpandTimer();
+          return prev;
+        }
+
+        scheduleExpandCheck();
+        return true;
+      });
+    };
+
+    const scheduleMeasure = () => {
+      window.requestAnimationFrame(measureLayout);
+    };
+
+    scheduleMeasure();
+
+    const observer =
+      typeof ResizeObserver !== "undefined" && headerRef.current
+        ? new ResizeObserver(scheduleMeasure)
+        : null;
+    if (observer && headerRef.current) {
+      observer.observe(headerRef.current);
+    }
+    window.addEventListener("resize", scheduleMeasure);
+
+    return () => {
+      clearExpandTimer();
+      observer?.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, [
+    activitySidebarOpen,
+    globalTranscript,
+    isFirstRun,
+    selectedProject,
+    sidebarTransitioning,
+    ui.activeView,
+    isRecordCompact,
+  ]);
+
+  const showRecordText = !isRecordCompact && !(sidebarTransitioning && activitySidebarOpen);
+  const recordButtonLabel =
+    voiceLoading && activeRecordingField === "global"
+      ? "Transcribing..."
+      : activeRecordingField === "global"
+        ? "Stop Recording"
+        : "Record";
+
   return (
-    <header className={styles.header}>
+    <header ref={headerRef} className={styles.header}>
       {isFirstRun ? (
         <div className="text-xs font-bold uppercase tracking-[0.4em] text-[var(--muted)]">
           Welcome to Task Centric Planner
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <nav className="flex gap-2">
+        <div ref={navGroupRef} className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <nav className="no-scrollbar flex min-w-0 max-w-[58vw] snap-x snap-mandatory gap-1 overflow-x-auto pr-1 sm:max-w-none sm:gap-2 sm:overflow-visible sm:pr-0">
             {views.map((view) => (
               <button
                 key={view}
@@ -91,21 +287,26 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
                     : "bg-transparent text-[var(--muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
                   }`}
               >
-                {view === "brainstorm"
-                  ? "drawing board"
-                  : view === "projects"
-                    ? "settings"
-                    : view}
+                {view === "brainstorm" ? (
+                  <>
+                    <span className="sm:hidden">board</span>
+                    <span className="hidden sm:inline">drawing board</span>
+                  </>
+                ) : view === "projects" ? (
+                  ui.selectedProjectId ? "settings" : "new project"
+                ) : (
+                  view
+                )}
               </button>
             ))}
           </nav>
         </div>
       )}
 
-      <div className="flex flex-nowrap items-center gap-4">
+      <div ref={controlsGroupRef} className="ml-auto flex items-center gap-3 sm:gap-4">
         {!isFirstRun && (
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-[var(--muted)]">
+            <label className="hidden text-xs font-medium text-[var(--muted)] sm:block">
               Date
             </label>
             <input
@@ -122,13 +323,19 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
             <div className="flex items-center gap-3">
               <button
                 onClick={handleVoiceCapture}
-                className={`relative flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] shadow-sm transition hover:-translate-y-0.5 ${activeRecordingField === "global"
+                aria-label={recordButtonLabel}
+                title={recordButtonLabel}
+                className={`relative flex h-9 items-center justify-center rounded-full border text-xs font-bold shadow-sm transition hover:-translate-y-0.5 ${
+                  showRecordText ? "gap-2 px-4" : "w-9"
+                } ${activeRecordingField === "global"
                     ? "animate-pulse border-red-500 bg-red-50 text-red-600"
                     : "border-[var(--border-medium)] bg-white text-[var(--ink)]"
                   }`}
               >
                 {activeRecordingField === "global" && (
-                  <span className="h-2 w-2 rounded-full bg-red-600" />
+                  <>
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-600" />
+                  </>
                 )}
                 <svg
                   width="14"
@@ -144,16 +351,12 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                   <line x1="12" y1="19" x2="12" y2="22" />
                 </svg>
-                {voiceLoading && activeRecordingField === "global"
-                  ? "Transcribing..."
-                  : activeRecordingField === "global"
-                    ? "Stop Recording"
-                    : "Record"}
+                {showRecordText && <span>{recordButtonLabel}</span>}
               </button>
-              {!activitySidebarOpen && (
+              {!activitySidebarOpen && !sidebarTransitioning && (
                 <button
                   onClick={onToggleActivity}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
                   title="Show activity"
                   aria-label="Show activity"
                 >
@@ -186,10 +389,14 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
           </div>
         )}
 
-        {!isFirstRun && ui.activeView !== "brainstorm" && !selectedProject && !activitySidebarOpen && (
+        {!isFirstRun &&
+          ui.activeView !== "brainstorm" &&
+          !selectedProject &&
+          !activitySidebarOpen &&
+          !sidebarTransitioning && (
           <button
             onClick={onToggleActivity}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
             title="Show activity"
             aria-label="Show activity"
           >
@@ -212,3 +419,4 @@ export default function AppHeader({ activitySidebarOpen, onToggleActivity }: App
     </header>
   );
 }
+

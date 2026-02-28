@@ -1,71 +1,95 @@
 # UI Issues
 
-Visual audit run: 2026-02-25  
-Artifacts: `docs/ui/` (curated), `output/playwright/` (transient local captures)
+Last updated: 2026-02-27  
+Scope: Plan view visual audit (desktop) using latest in-chat screenshot, plus previously tracked UI regressions.
 
-## Resolved In This Pass (2026-02-25)
-- `UI-R01` Manual task `Add` button alignment in the central panel was inconsistent with adjacent controls.
-- Status: Fixed
-- Evidence: `docs/ui/ui-13-manual-task-added-after-surgical-fixes.png`
-- Notes: Manual input, time control, and add action now share a consistent row rhythm on desktop, with mobile-safe stacking.
+## Status
+- Previously tracked issues `UI-001` through `UI-005` are fixed and kept in the resolved archive.
+- New visual-polish items `UI-006` through `UI-013` are open from the latest eye-strain/readability pass.
 
-- `UI-R02` Scope label in manual task form was squeezed into the bottom-right corner and visually easy to miss.
-- Status: Fixed
-- Evidence: `docs/ui/ui-13-manual-task-added-after-surgical-fixes.png`
-- Notes: Scope is now rendered as a dedicated line below the input row with stronger legibility.
+## Priority Legend
+- P1: major readability/usability friction in primary flow
+- P2: notable clarity/scannability problem
+- P3: polish-level inconsistency
 
-## UI-001
-- Severity: High
-- Area: Global navigation (mobile)
-- Issue: Top nav items overflow/truncate on small screens (`HISTORY` is clipped), which makes primary navigation unclear on first glance.
-- Evidence: `docs/ui/ui-12-mobile-drawing-board.png`
-- Repro:
-1. Open the app on a mobile viewport (around 390x844).
-2. Go to the Drawing Board view.
-3. Observe the top nav labels at the right edge.
-- Suggested fix: Replace the current fixed-width tab row with a mobile pattern (horizontal scroll with snap, condensed labels, or a menu button).
+## Open Items (2026-02-27 audit)
 
-## UI-002
-- Severity: Medium
-- Area: Drawing Board conversation layout
-- Issue: Large unused vertical space appears between the latest assistant message and the suggestion/input region, pushing key controls lower than needed.
-- Evidence: `docs/ui/ui-11-drawing-board-suggestions.png`
-- Repro:
-1. Open Drawing Board.
-2. Send an initial prompt.
-3. Observe the large blank block in the main thread area.
-- Suggested fix: Tighten the chat layout so suggestions/input stay closer to the latest message, and cap conversation region height with predictable overflow behavior.
+1. `UI-006` (P1) - Too many competing focal points across three columns
+- Area: App shell layout (`Project rail`, `Plan canvas`, `Activity rail`)
+- Issue: Left, center, and right regions have similar visual weight, so users do not get a clear primary reading path.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Reduce peripheral contrast and default-emphasize center canvas; keep side rails visually quieter unless actively used.
 
-## UI-003
-- Severity: Medium
-- Area: Settings -> Start New Project flow
-- Issue: After `Start New Project`, the screen shows the create form but the nav still highlights `SETTINGS`, which creates a view-state mismatch.
-- Evidence: `docs/ui/ui-10-start-new-project-form.png`
-- Repro:
-1. Create/select a project.
-2. Open Settings.
-3. Click `Start New Project`.
-4. Observe that the create form appears while `SETTINGS` remains the active tab.
-- Suggested fix: Move this state to a dedicated create/onboarding route or update active-nav logic to match the rendered view.
+2. `UI-007` (P1) - Weak hierarchy in task/control blocks
+- Area: Plan header, generation controls, task card headers
+- Issue: Primary actions and supporting metadata look too similar in weight, forcing extra scanning effort.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Establish strict emphasis tiers (primary CTA, secondary CTA, metadata) with consistent weight, size, and color rules.
 
-## UI-004
-- Severity: Medium
-- Area: App shell scrolling behavior (desktop)
-- Issue: Multiple independent scroll containers are visible at once, producing competing scrollbars and reducing readability of long pages.
-- Evidence: `docs/ui/ui-04-plan-initial.png`, `docs/ui/ui-10-start-new-project-form.png`
-- Repro:
-1. Open Plan or Create Project views on desktop.
-2. Scroll the page and inspect the right-side gutters.
-3. Observe concurrent scrollbars in the shell/content regions.
-- Suggested fix: Consolidate to one primary vertical scroll container per layout mode and avoid nested `overflow-y-auto` regions unless intentional.
+3. `UI-008` (P2) - Typography density and all-caps overuse reduce legibility
+- Area: Milestone chips, batch headers, minor labels
+- Issue: Wide tracking + all-caps + small text creates visual noise and reading fatigue.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Reduce letter spacing on utility labels, limit all-caps to rare micro-labels, and increase body/supporting text size.
 
-## UI-005
-- Severity: Low
-- Area: Activity rail empty state
-- Issue: Empty Activity rail occupies persistent horizontal space even when it only shows a short placeholder, reducing room for core content.
-- Evidence: `docs/ui/ui-04-plan-initial.png`, `docs/ui/ui-08-history-view.png`
-- Repro:
-1. Open the app with little/no activity data.
-2. Navigate Plan or History.
-3. Observe the right rail consuming width with minimal content.
-- Suggested fix: Auto-collapse or shrink the rail in empty state, with a lightweight affordance to reopen it.
+4. `UI-009` (P1) - Readability drop from low-contrast text on tinted surfaces
+- Area: Secondary descriptions, helper lines, metadata
+- Issue: Gray text on off-white/tinted cards is difficult to scan quickly, especially for dense task descriptions.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Raise contrast for secondary text and simplify tinted backgrounds where text density is high.
+
+5. `UI-010` (P2) - Border/pill/card over-segmentation
+- Area: Generation controls and task list containerization
+- Issue: Nearly every block is outlined, causing a fragmented, busy appearance.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Remove non-essential borders, rely more on spacing/grouping, reserve container chrome for meaningful sections only.
+
+6. `UI-011` (P2) - Inconsistent vertical rhythm
+- Area: Plan canvas spacing between sections and cards
+- Issue: Some regions feel cramped while others are overly open, creating unstable scan rhythm.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Apply a single spacing scale (for example 8/12/16/24) and normalize padding/margins by component tier.
+
+7. `UI-012` (P2) - Accent color saturation dilutes action priority
+- Area: Tabs, CTAs, links, status accents
+- Issue: Orange is used in too many competing contexts, so important actions no longer stand out.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Restrict strong orange to one primary action per zone; shift supporting emphasis to neutral or subdued tones.
+
+8. `UI-013` (P3) - Top bar control grouping is crowded
+- Area: Global top bar (`Date`, `Record`, `Activity`, view nav)
+- Issue: Distinct control groups are packed into one strip with weak separation.
+- Evidence: User-provided Plan screenshot (2026-02-27)
+- Suggested fix: Re-group top bar into clear clusters (navigation, session controls, context/date) with consistent spacing rules.
+
+## Make It Calmer Plan (Proposed)
+
+### Phase 1 - Fast wins (half day)
+- Define and apply a tighter type scale for Plan view only:
+  - `title` strong, `section` medium, `body` readable, `meta` restrained.
+- Raise contrast on secondary/helper text and reduce all-caps usage.
+- Limit orange to primary CTA and active state; convert secondary emphasis to neutral styles.
+
+### Phase 2 - Visual simplification (1 day)
+- Remove low-value borders and pills in generation/task regions.
+- Normalize spacing with one layout rhythm across cards, sections, and controls.
+- Reduce prominence of side rails so the center plan remains dominant.
+
+### Phase 3 - Structure and grouping (1 day)
+- Re-group top bar controls by intent and add spacing separators.
+- Introduce a calm default for empty/low-signal side content (quieter surfaces, less outline noise).
+- Validate desktop + mobile screenshots against a simple checklist:
+  - single focal point, readable secondary text, one obvious primary action.
+
+## Resolved Archive
+
+### Resolved on 2026-02-25
+- `UI-R01` Manual task `Add` button alignment mismatch in central panel.
+- `UI-R02` Manual task scope label placement/visibility issue.
+
+### Resolved on 2026-02-27
+- `UI-001` Mobile top-nav clipping in narrow viewports.
+- `UI-002` Excess blank space between latest Drawing Board response and input controls.
+- `UI-003` `Start New Project` view/nav mismatch.
+- `UI-004` Competing vertical scrollbars in shell/content.
+- `UI-005` Empty activity rail consuming persistent width.

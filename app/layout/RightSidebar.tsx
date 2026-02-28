@@ -9,8 +9,7 @@ const styles = {
   wrapper:
     "fixed inset-y-0 right-0 z-30 flex-shrink-0 overflow-visible transition-all duration-500 ease-out md:relative md:inset-auto md:z-auto",
   toggleButton:
-    "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
-  toggleButtonOpen: "shrink-0",
+    "flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   aside:
     "no-scrollbar flex h-full w-full flex-col overflow-hidden bg-white/60 shadow-sm transition-all duration-500 ease-out",
 };
@@ -33,6 +32,7 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
       selectScopedActivities(state, selectedProject?.id, selectedDate, showAllActivity),
     ),
   );
+  const showEmptyState = !!selectedProject && scopedActivities.length === 0;
 
   const renderToggleButton = (className: string) => (
     <button
@@ -67,9 +67,9 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
         }`}
       >
         <>
-          <div className="mb-6 flex items-center justify-between gap-2">
+          <div className="mb-6 mt-1.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              {isOpen && renderToggleButton(styles.toggleButtonOpen)}
+              {isOpen && renderToggleButton("")}
               <h3 className="pl-1 text-sm font-semibold text-[var(--muted)]">
                 Activity
               </h3>
@@ -96,16 +96,27 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
             {!selectedProject && (
               <p className="text-sm text-[var(--muted)] italic">Select a project.</p>
             )}
-            {selectedProject && scopedActivities.length === 0 && (
-              <p className="text-sm text-[var(--muted)]">
-                {showAllActivity
-                  ? "No activity logged yet."
-                  : `No activity for ${selectedDate}.`}
-              </p>
+            {showEmptyState && (
+              <div className="grid gap-3 rounded-2xl border border-[var(--border-subtle)] bg-white/80 p-4 text-sm text-[var(--muted)]">
+                <p>
+                  {showAllActivity
+                    ? "No activity logged yet."
+                    : `No activity for ${selectedDate}.`}
+                </p>
+                {!showAllActivity && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllActivity(true)}
+                    className="w-fit rounded-full border border-[var(--border-medium)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ink)] transition hover:-translate-y-0.5"
+                  >
+                    View all activity
+                  </button>
+                )}
+              </div>
             )}
             {selectedProject &&
               scopedActivities.map((activity) => (

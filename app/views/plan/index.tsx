@@ -85,6 +85,8 @@ export default function PlanView() {
   const [manualEstimate, setManualEstimate] = useState(25);
   const [pendingManualTaskScroll, setPendingManualTaskScroll] = useState(false);
   const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
   const sidebarMilestoneSelectRef = useRef(false);
   const newestTaskRef = useRef<HTMLDivElement | null>(null);
   const planMilestoneByProject = ui.planMilestoneByProject ?? {};
@@ -122,6 +124,8 @@ export default function PlanView() {
   const selectedMilestone = selectedMilestoneId
     ? projectMilestones.find((milestone) => milestone.id === selectedMilestoneId)
     : undefined;
+  const notesCharCount = planNotes.trim().length;
+  const hasManualDraft = !!manualTitle.trim();
 
   const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
 
@@ -443,55 +447,116 @@ export default function PlanView() {
               aiPromptRef={aiPromptRef}
             />
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-[var(--muted)]">
-                Today&apos;s Notes
-              </label>
-              <div className="relative flex min-w-0 items-center rounded-2xl bg-[var(--panel)] shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
-                <textarea
-                  value={planNotes}
-                  onChange={(event) => setPlanNotes(event.target.value)}
-                  rows={2}
-                  className="w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-3 placeholder:text-sm focus:outline-none pr-12"
-                  placeholder="What should you remember while working today?"
-                />
-                <div className="absolute right-2 top-2">
-                  <DictationMic
-                    isRecording={activeRecordingField === "planNotes"}
-                    onClick={() => {
-                      if (activeRecordingField === "planNotes") stopRecording();
-                      else
-                        startRecording(
-                          "planNotes",
-                          (text) => setPlanNotes((prev) => (prev ? `${prev}\n${text}` : text)),
-                          "Context: These are raw planning notes for the day.",
-                        );
-                    }}
+            <div className="grid gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setShouldScrollToRegenMessage(true);
+                    handleGenerate();
+                  }}
+                  className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
+                  disabled={isGenerating}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <path d="m5 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+                    <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
+                  </svg>
+                  {isGenerating ? "Generating..." : "Generate Tasks"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNotesOpen((prev) => !prev)}
+                  className="rounded-full border border-[var(--border-medium)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                >
+                  {isNotesOpen ? "Hide Notes" : "Today's Notes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsManualOpen((prev) => !prev)}
+                  className="rounded-full border border-[var(--border-medium)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+                >
+                  {isManualOpen ? "Hide Manual Task" : "Add Manual Task"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--muted)]">
+                <span>
+                  Notes:{" "}
+                  <span className="font-medium text-[var(--ink)]">
+                    {notesCharCount > 0 ? `${notesCharCount} chars` : "empty"}
+                  </span>
+                </span>
+                <span>
+                  Manual draft:{" "}
+                  <span className="font-medium text-[var(--ink)]">
+                    {hasManualDraft ? "in progress" : "empty"}
+                  </span>
+                </span>
+                <span>Scope: {selectedMilestone?.title || "Whole Project"}</span>
+              </div>
+              <p className="text-xs text-[var(--muted)]">
+                Keep this area collapsed for focus, then expand only what you need.
+              </p>
+            </div>
+
+            {isNotesOpen && (
+              <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
+                <label className="text-sm font-semibold text-[var(--muted)]">
+                  Today&apos;s Notes
+                </label>
+                <div className="relative flex min-w-0 items-center rounded-2xl bg-[var(--panel)] shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                  <textarea
+                    value={planNotes}
+                    onChange={(event) => setPlanNotes(event.target.value)}
+                    rows={2}
+                    className="w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-3 placeholder:text-sm focus:outline-none pr-12"
+                    placeholder="What should you remember while working today?"
                   />
+                  <div className="absolute right-2 top-2">
+                    <DictationMic
+                      isRecording={activeRecordingField === "planNotes"}
+                      onClick={() => {
+                        if (activeRecordingField === "planNotes") stopRecording();
+                        else
+                          startRecording(
+                            "planNotes",
+                            (text) => setPlanNotes((prev) => (prev ? `${prev}\n${text}` : text)),
+                            "Context: These are raw planning notes for the day.",
+                          );
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-              {notesFromVoice && (
-                <p className="text-xs text-[var(--muted)]">
-                  Voice capture ready — use the header button to add it to notes.
-                </p>
-              )}
-            </div>
-          </div>
+            )}
 
-          <div className="flex items-center gap-3 pt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
-            <span>Manual Tasks</span>
-            <div className="h-px flex-1 bg-[rgba(15,23,42,0.12)]" />
-          </div>
+            {isManualOpen && (
+              <ManualTaskForm
+                manualTitle={manualTitle}
+                setManualTitle={setManualTitle}
+                manualEstimate={manualEstimate}
+                setManualEstimate={setManualEstimate}
+                onAdd={handleAddManualTask}
+                selectedMilestoneTitle={selectedMilestone?.title}
+              />
+            )}
 
-          <ManualTaskForm
-            manualTitle={manualTitle}
-            setManualTitle={setManualTitle}
-            manualEstimate={manualEstimate}
-            setManualEstimate={setManualEstimate}
-            onAdd={handleAddManualTask}
-            selectedMilestoneTitle={selectedMilestone?.title}
-          />
+            {notesFromVoice && (
+              <p className="text-xs text-[var(--muted)]">
+                Voice capture ready — use the header button to add it to notes.
+              </p>
+            )}
+          </div>
 
           <div className="grid min-w-0 gap-3">
             {planTasks.length === 0 && !isGenerating && (
@@ -549,37 +614,6 @@ export default function PlanView() {
                 ))}
               </>
             )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setShouldScrollToRegenMessage(true);
-                handleGenerate();
-              }}
-              className="flex items-center justify-center gap-2 self-start rounded-full bg-[var(--accent)] px-5 py-3 text-xs uppercase tracking-[0.25em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
-              disabled={isGenerating}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="overflow-visible"
-                aria-hidden="true"
-              >
-                <path d="m5 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
-                <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
-              </svg>
-              {isGenerating ? "Generating..." : "Generate Tasks"}
-            </button>
-            <p className="text-xs text-[var(--muted)]">
-              AI generation respects your pinned tasks and budget constraints.
-            </p>
           </div>
 
           {regenBudgetMessage && (

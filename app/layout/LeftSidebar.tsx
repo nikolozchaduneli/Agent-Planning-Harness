@@ -13,7 +13,7 @@ const styles = {
   toggleButton:
     "absolute top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   aside:
-    "no-scrollbar flex h-full w-full flex-col gap-6 overflow-hidden bg-white/60 shadow-sm transition-all duration-600 ease-out",
+    "no-scrollbar flex h-full min-h-0 w-full flex-col gap-6 overflow-y-auto bg-white/60 shadow-sm transition-all duration-600 ease-out md:overflow-hidden",
   dropdownButton:
     "flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
   dropdownPanel:
@@ -125,7 +125,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
   }, [dailyPlans, selectedProject, tasks]);
 
   return (
-    <div className={`${styles.wrapper} ${isOpen ? "w-[360px]" : "w-12"}`}>
+    <div className={`${styles.wrapper} ${isOpen ? "w-[min(360px,92vw)] sm:w-[360px]" : "w-12"}`}>
       <button
         onClick={onToggle}
         className={`${styles.toggleButton} ${isOpen ? "right-2" : "left-1/2 -translate-x-[32%]"
@@ -341,7 +341,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="grid gap-3 pb-1 md:flex md:min-h-0 md:flex-1 md:flex-col">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[var(--muted)]">
                   Milestones
@@ -378,7 +378,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                   </button>
                 </div>
               </div>
-              <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-6 -mr-6">
+              <div className="no-scrollbar flex min-h-[120px] max-h-[40vh] flex-col gap-2 overflow-y-auto pr-2 -mr-2 md:min-h-0 md:flex-1 md:max-h-none md:pr-6 md:-mr-6">
                 {milestones
                   .filter((milestone) => milestone.projectId === selectedProject.id)
                   .map((milestone) => (

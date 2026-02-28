@@ -30,6 +30,11 @@ Scope: Playwright MCP end-to-end regression after fixes + targeted code review.
 - Evidence: no runtime imports for `ai-prompts/*`; prompts are inlined in `app/api/ai/*` and `app/api/voice/transcribe/route.ts`.
 - Validation: Keep verifying with `rg -n "ai-prompts" app lib` whenever prompt work is proposed.
 
+4. P1 - Production build currently fails under Next.js worker execution
+- Impact: `npm run build` cannot complete, blocking production validation in this environment.
+- Evidence: `next build` fails with `TypeError: process.chdir() is not supported in workers` from `next.config.compiled.js:17`.
+- Validation: Re-run `npm run build` after adjusting/removing the worker-incompatible `process.chdir()` call path in Next config.
+
 ## Resolved on 2026-02-25 (verified)
 
 1. P1 - `Start New Project` had no creation path when projects already existed

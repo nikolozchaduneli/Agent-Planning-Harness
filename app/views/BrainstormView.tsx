@@ -35,13 +35,19 @@ export default function BrainstormView() {
   } =
     useBrainstorm();
   const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
+  const hasConversation = brainstormMessages.length > 0 || isBrainstorming;
 
   return (
-    <section className="grid gap-8 md:grid-cols-[1fr_360px] h-[calc(100vh-118px)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col rounded-[32px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] backdrop-blur-md border border-white/50 overflow-hidden">
-        <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-4 no-scrollbar scroll-smooth">
-          {brainstormMessages.length === 0 && (
-            <div className="text-center py-20 px-4">
+    <section className="grid h-full min-h-0 gap-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 lg:gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="flex min-h-0 flex-col rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] backdrop-blur-md overflow-hidden">
+        <div className="no-scrollbar flex min-h-0 flex-1 overflow-y-auto pr-2 scroll-smooth">
+          <div
+            className={`flex min-h-full w-full flex-col gap-4 ${
+              hasConversation ? "justify-end py-2" : "justify-center"
+            }`}
+          >
+            {brainstormMessages.length === 0 && (
+              <div className="px-4 py-12 text-center">
               <div className="mx-auto w-16 h-16 rounded-2xl bg-[var(--accent)] text-white flex items-center justify-center mb-6 shadow-lg shadow-[var(--accent)]/30">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
@@ -68,42 +74,43 @@ export default function BrainstormView() {
                   Skip to manual setup
                 </button>
               )}
-            </div>
-          )}
-
-          {brainstormMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`max-w-[85%] rounded-[24px] p-5 text-[15px] leading-relaxed shadow-sm transition-all ${
-                msg.role === "user"
-                  ? "self-end bg-[var(--accent)] text-white"
-                  : "self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--ink)]"
-              }`}
-            >
-              {msg.content}
-            </div>
-          ))}
-
-          {isBrainstorming && (
-            <div className="self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--muted)] rounded-[24px] p-5 text-sm animate-pulse flex items-center gap-3">
-              <div className="flex gap-1">
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <div
-                  className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
               </div>
-              Thinking...
-            </div>
-          )}
-          <div id="anchor" />
+            )}
+
+            {brainstormMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`max-w-[85%] rounded-[24px] p-5 text-[15px] leading-relaxed shadow-sm transition-all ${
+                  msg.role === "user"
+                    ? "self-end bg-[var(--accent)] text-white"
+                    : "self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--ink)]"
+                }`}
+              >
+                {msg.content}
+              </div>
+            ))}
+
+            {isBrainstorming && (
+              <div className="self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--muted)] rounded-[24px] p-5 text-sm animate-pulse flex items-center gap-3">
+                <div className="flex gap-1">
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
+                </div>
+                Thinking...
+              </div>
+            )}
+            <div id="anchor" />
+          </div>
         </div>
 
         <form id="brainstorm-form" onSubmit={handleBrainstorm} className="mt-6 flex flex-col gap-3">
@@ -180,13 +187,13 @@ export default function BrainstormView() {
         </form>
       </div>
 
-      <div className="flex flex-col gap-6 pr-6 overflow-y-auto no-scrollbar">
-        <div className="rounded-[32px] bg-white/40 border border-white/60 p-6 backdrop-blur-md shadow-[0_10px_30px_-15px_rgba(15,23,42,0.1)]">
+      <div className="no-scrollbar flex min-h-0 flex-col gap-6 overflow-y-auto pr-2 lg:pr-6">
+        <div className="flex min-h-0 flex-1 flex-col rounded-[32px] bg-white/40 border border-white/60 p-6 backdrop-blur-md shadow-[0_10px_30px_-15px_rgba(15,23,42,0.1)]">
           <h3 className="text-xs font-bold uppercase tracking-[0.3em] text-[var(--muted)] mb-6">
             Live Canvas
           </h3>
           {activeDraft ? (
-            <div className="flex flex-col gap-5">
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] uppercase font-bold tracking-[0.1em] text-[var(--muted)]/60">
                   Project Name
@@ -272,7 +279,7 @@ export default function BrainstormView() {
               </button>
             </div>
           ) : (
-            <div className="text-center py-24 flex flex-col items-center gap-4">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 py-8 text-center">
               <div className="w-12 h-12 rounded-full border-2 border-dashed border-[var(--muted)]/30 flex items-center justify-center">
                 <svg className="text-[var(--muted)]/30" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />

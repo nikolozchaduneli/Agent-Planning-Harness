@@ -31,7 +31,9 @@ export default function FocusView() {
         </button>
       </div>
       {!focusTask && (
-        <p className="text-sm text-[var(--muted)]">No focus task. Pick one from the plan.</p>
+        <div className="rounded-[24px] border border-dashed border-[rgba(15,23,42,0.2)] bg-white/70 p-6">
+          <p className="text-sm text-[var(--muted)]">No focus task. Pick one from the plan.</p>
+        </div>
       )}
       {focusTask && (
         <div className="grid gap-4 rounded-[24px] border border-[var(--border-medium)] bg-white/90 p-6 shadow-sm">

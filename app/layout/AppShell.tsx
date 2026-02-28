@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
 import AppHeader from "@/app/layout/AppHeader";
@@ -16,20 +16,94 @@ import { VoiceRecordingProvider } from "@/app/hooks/useVoiceRecording";
 
 const styles = {
   shell: "relative flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-[15px]",
-  mainBase: "no-scrollbar flex min-w-0 flex-1 flex-col",
-  mainOverflowBrainstorm: "overflow-hidden",
-  mainOverflowDefault: "overflow-y-auto",
-  contentWrap: "mx-auto w-full px-4 sm:px-6 lg:px-8",
+  mainBase: "flex min-w-0 flex-1 flex-col overflow-hidden",
+  contentViewportBase: "min-h-0 flex-1",
+  contentViewportBrainstorm: "overflow-hidden",
+  contentViewportDefault: "overflow-y-auto",
+  contentInnerBase: "mx-auto w-full px-4 sm:px-6 lg:px-8",
+  contentInnerBrainstorm: "h-full max-w-none py-6",
+  contentInnerDefault: "max-w-5xl py-10 pb-20",
 };
 
 export default function AppShell() {
-  const { ui, projects } = useAppStore(
-    useShallow((state) => ({ ui: state.ui, projects: state.projects })),
+  const { ui, projects, activities } = useAppStore(
+    useShallow((state) => ({
+      ui: state.ui,
+      projects: state.projects,
+      activities: state.activities,
+    })),
   );
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [showActivitySidebar, setShowActivitySidebar] = useState(true);
+  const [leftSidebarTransitioning, setLeftSidebarTransitioning] = useState(false);
+  const [activitySidebarTransitioning, setActivitySidebarTransitioning] = useState(false);
+  const leftSidebarTransitionTimerRef = useRef<number | null>(null);
+  const activitySidebarTransitionTimerRef = useRef<number | null>(null);
+  const [manualActivitySidebarByProject, setManualActivitySidebarByProject] = useState<
+    Record<string, true>
+  >({});
 
   const isFirstRun = projects.length === 0;
+  const selectedProjectActivityCount = useMemo(() => {
+    if (!ui.selectedProjectId) return 0;
+    return activities.filter((activity) => activity.projectId === ui.selectedProjectId).length;
+  }, [activities, ui.selectedProjectId]);
+  const hasManualActivityPreference =
+    !!ui.selectedProjectId && !!manualActivitySidebarByProject[ui.selectedProjectId];
+  const shouldAutoCollapseActivitySidebar =
+    !!ui.selectedProjectId &&
+    selectedProjectActivityCount === 0 &&
+    !hasManualActivityPreference;
+  const isActivitySidebarOpen = showActivitySidebar && !shouldAutoCollapseActivitySidebar;
+  const startLeftSidebarTransition = () => {
+    if (leftSidebarTransitionTimerRef.current !== null) {
+      window.clearTimeout(leftSidebarTransitionTimerRef.current);
+    }
+    setLeftSidebarTransitioning(true);
+    leftSidebarTransitionTimerRef.current = window.setTimeout(() => {
+      setLeftSidebarTransitioning(false);
+      leftSidebarTransitionTimerRef.current = null;
+    }, 650);
+  };
+  const startActivitySidebarTransition = () => {
+    if (activitySidebarTransitionTimerRef.current !== null) {
+      window.clearTimeout(activitySidebarTransitionTimerRef.current);
+    }
+    setActivitySidebarTransitioning(true);
+    activitySidebarTransitionTimerRef.current = window.setTimeout(() => {
+      setActivitySidebarTransitioning(false);
+      activitySidebarTransitionTimerRef.current = null;
+    }, 560);
+  };
+  const handleToggleLeftSidebar = () => {
+    startLeftSidebarTransition();
+    setIsLeftSidebarOpen((prev) => !prev);
+  };
+  const handleToggleActivitySidebar = () => {
+    startActivitySidebarTransition();
+    if (ui.selectedProjectId && !manualActivitySidebarByProject[ui.selectedProjectId]) {
+      setManualActivitySidebarByProject((prev) => ({
+        ...prev,
+        [ui.selectedProjectId as string]: true,
+      }));
+    }
+    if (!isActivitySidebarOpen) {
+      setShowActivitySidebar(true);
+      return;
+    }
+    setShowActivitySidebar(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (leftSidebarTransitionTimerRef.current !== null) {
+        window.clearTimeout(leftSidebarTransitionTimerRef.current);
+      }
+      if (activitySidebarTransitionTimerRef.current !== null) {
+        window.clearTimeout(activitySidebarTransitionTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isFirstRun) return;
@@ -56,7 +130,19 @@ export default function AppShell() {
 
   useEffect(() => {
     const handleOpenLeft = () => {
-      setIsLeftSidebarOpen(true);
+      setIsLeftSidebarOpen((prev) => {
+        if (!prev) {
+          if (leftSidebarTransitionTimerRef.current !== null) {
+            window.clearTimeout(leftSidebarTransitionTimerRef.current);
+          }
+          setLeftSidebarTransitioning(true);
+          leftSidebarTransitionTimerRef.current = window.setTimeout(() => {
+            setLeftSidebarTransitioning(false);
+            leftSidebarTransitionTimerRef.current = null;
+          }, 650);
+        }
+        return true;
+      });
       setTimeout(() => {
         const select = document.getElementById("active-project-select") as
           | HTMLSelectElement
@@ -76,44 +162,52 @@ export default function AppShell() {
         {!isFirstRun && (
           <LeftSidebar
             isOpen={isLeftSidebarOpen}
-            onToggle={() => setIsLeftSidebarOpen((prev) => !prev)}
+            onToggle={handleToggleLeftSidebar}
           />
         )}
 
-        <main
-          className={`${styles.mainBase} ${
-            ui.activeView === "brainstorm"
-              ? styles.mainOverflowBrainstorm
-              : styles.mainOverflowDefault
-          }`}
-        >
+        <main className={styles.mainBase}>
           <AppHeader
-            activitySidebarOpen={showActivitySidebar}
-            onToggleActivity={() => setShowActivitySidebar((prev) => !prev)}
+            leftSidebarOpen={isLeftSidebarOpen}
+            activitySidebarOpen={isActivitySidebarOpen}
+            sidebarTransitioning={leftSidebarTransitioning || activitySidebarTransitioning}
+            onToggleActivity={handleToggleActivitySidebar}
           />
           <div
-            className={`${styles.contentWrap} ${
-              ui.activeView === "brainstorm" ? "py-6 max-w-none" : "py-10 pb-20 max-w-5xl"
+            className={`${styles.contentViewportBase} ${
+              ui.activeView === "brainstorm"
+                ? styles.contentViewportBrainstorm
+                : styles.contentViewportDefault
             }`}
           >
             <div
-              key={ui.activeView}
-              className="animate-in fade-in slide-in-from-bottom-1 duration-500 ease-out"
+              className={`${styles.contentInnerBase} ${
+                ui.activeView === "brainstorm"
+                  ? styles.contentInnerBrainstorm
+                  : styles.contentInnerDefault
+              }`}
             >
-              {isFirstRun && ui.activeView !== "brainstorm" && <OnboardingView />}
-              {ui.activeView === "brainstorm" && <BrainstormView />}
-              {!isFirstRun && ui.activeView === "plan" && <PlanView />}
-              {!isFirstRun && ui.activeView === "focus" && <FocusView />}
-              {!isFirstRun && ui.activeView === "history" && <HistoryView />}
-              {!isFirstRun && ui.activeView === "projects" && <ProjectSettingsView />}
+              <div
+                key={ui.activeView}
+                className={`animate-in fade-in slide-in-from-bottom-1 duration-500 ease-out ${
+                  ui.activeView === "brainstorm" ? "h-full" : ""
+                }`}
+              >
+                {isFirstRun && ui.activeView !== "brainstorm" && <OnboardingView />}
+                {ui.activeView === "brainstorm" && <BrainstormView />}
+                {!isFirstRun && ui.activeView === "plan" && <PlanView />}
+                {!isFirstRun && ui.activeView === "focus" && <FocusView />}
+                {!isFirstRun && ui.activeView === "history" && <HistoryView />}
+                {!isFirstRun && ui.activeView === "projects" && <ProjectSettingsView />}
+              </div>
             </div>
           </div>
         </main>
 
         {!isFirstRun && ui.activeView !== "brainstorm" && (
           <RightSidebar
-            isOpen={showActivitySidebar}
-            onToggle={() => setShowActivitySidebar((prev) => !prev)}
+            isOpen={isActivitySidebarOpen}
+            onToggle={handleToggleActivitySidebar}
           />
         )}
       </div>
