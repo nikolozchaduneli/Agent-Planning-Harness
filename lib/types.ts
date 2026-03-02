@@ -52,6 +52,7 @@ export type Milestone = {
   id: string;
   projectId: string;
   title: string;
+  description?: string;
   status: "active" | "completed";
   createdAt: string;
 };
@@ -80,6 +81,7 @@ export type BrainstormDraft = {
 };
 
 export type AppView = "projects" | "plan" | "focus" | "history" | "brainstorm";
+export type ThemeScheme = "sage" | "mist" | "dawn";
 
 export type AppState = {
   projects: Project[];
@@ -94,6 +96,7 @@ export type AppState = {
     selectedProjectId?: string;
     selectedDate: string;
     activeView: AppView;
+    themeScheme: ThemeScheme;
     focusTaskId?: string;
     planMilestoneByProject?: Record<string, string>;
     lastTranscript?: string;

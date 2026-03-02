@@ -14,54 +14,9 @@ Scope: Plan view visual audit (desktop) using latest in-chat screenshot, plus pr
 
 ## Open Items (2026-02-27 audit)
 
-1. `UI-006` (P1) - Too many competing focal points across three columns
-- Area: App shell layout (`Project rail`, `Plan canvas`, `Activity rail`)
-- Issue: Left, center, and right regions have similar visual weight, so users do not get a clear primary reading path.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Reduce peripheral contrast and default-emphasize center canvas; keep side rails visually quieter unless actively used.
+## Open Items (2026-02-27 audit)
 
-2. `UI-007` (P1) - Weak hierarchy in task/control blocks
-- Area: Plan header, generation controls, task card headers
-- Issue: Primary actions and supporting metadata look too similar in weight, forcing extra scanning effort.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Establish strict emphasis tiers (primary CTA, secondary CTA, metadata) with consistent weight, size, and color rules.
-
-3. `UI-008` (P2) - Typography density and all-caps overuse reduce legibility
-- Area: Milestone chips, batch headers, minor labels
-- Issue: Wide tracking + all-caps + small text creates visual noise and reading fatigue.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Reduce letter spacing on utility labels, limit all-caps to rare micro-labels, and increase body/supporting text size.
-
-4. `UI-009` (P1) - Readability drop from low-contrast text on tinted surfaces
-- Area: Secondary descriptions, helper lines, metadata
-- Issue: Gray text on off-white/tinted cards is difficult to scan quickly, especially for dense task descriptions.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Raise contrast for secondary text and simplify tinted backgrounds where text density is high.
-
-5. `UI-010` (P2) - Border/pill/card over-segmentation
-- Area: Generation controls and task list containerization
-- Issue: Nearly every block is outlined, causing a fragmented, busy appearance.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Remove non-essential borders, rely more on spacing/grouping, reserve container chrome for meaningful sections only.
-
-6. `UI-011` (P2) - Inconsistent vertical rhythm
-- Area: Plan canvas spacing between sections and cards
-- Issue: Some regions feel cramped while others are overly open, creating unstable scan rhythm.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Apply a single spacing scale (for example 8/12/16/24) and normalize padding/margins by component tier.
-
-7. `UI-012` (P2) - Accent color saturation dilutes action priority
-- Area: Tabs, CTAs, links, status accents
-- Issue: Orange is used in too many competing contexts, so important actions no longer stand out.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Restrict strong orange to one primary action per zone; shift supporting emphasis to neutral or subdued tones.
-
-8. `UI-013` (P3) - Top bar control grouping is crowded
-- Area: Global top bar (`Date`, `Record`, `Activity`, view nav)
-- Issue: Distinct control groups are packed into one strip with weak separation.
-- Evidence: User-provided Plan screenshot (2026-02-27)
-- Suggested fix: Re-group top bar into clear clusters (navigation, session controls, context/date) with consistent spacing rules.
-
+(No visual-polish items remain from the 2026-02-27 audit).
 ## Make It Calmer Plan (Proposed)
 
 ### Phase 1 - Fast wins (half day)
@@ -82,6 +37,21 @@ Scope: Plan view visual audit (desktop) using latest in-chat screenshot, plus pr
   - single focal point, readable secondary text, one obvious primary action.
 
 ## Resolved Archive
+
+### Resolved on 2026-03-01
+- `UI-009` Readability drop from low-contrast text on tinted surfaces.
+- `UI-010` Border/pill/card over-segmentation.
+- `UI-011` Inconsistent vertical rhythm.
+- `UI-012` Accent color saturation dilutes action priority.
+- `UI-016` Manual Task Addition Failure (Bug).
+- `UI-014` Task Pin Button Misalignment.
+- `UI-015` Unpolished Technical Status Strings.
+- `UI-017` Sidebar Milestone Tag Clipping/Overlap.
+- `UI-018` Insufficient Progress Bar Contrast.
+- `UI-008` Typography density and all-caps overuse reduce legibility.
+- `UI-013` Top bar control grouping is crowded.
+- `UI-006` Too many competing focal points across three columns.
+- `UI-007` Weak hierarchy in task/control blocks.
 
 ### Resolved on 2026-02-25
 - `UI-R01` Manual task `Add` button alignment mismatch in central panel.

@@ -15,7 +15,7 @@ import OnboardingView from "@/app/views/OnboardingView";
 import { VoiceRecordingProvider } from "@/app/hooks/useVoiceRecording";
 
 const styles = {
-  shell: "relative flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-[15px]",
+  shell: "relative flex h-screen w-screen overflow-hidden bg-[var(--paper)] text-[15px]",
   mainBase: "flex min-w-0 flex-1 flex-col overflow-hidden",
   contentViewportBase: "min-h-0 flex-1",
   contentViewportBrainstorm: "overflow-hidden",
@@ -42,6 +42,11 @@ export default function AppShell() {
   const [manualActivitySidebarByProject, setManualActivitySidebarByProject] = useState<
     Record<string, true>
   >({});
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.theme = ui.themeScheme;
+  }, [ui.themeScheme]);
 
   const isFirstRun = projects.length === 0;
   const selectedProjectActivityCount = useMemo(() => {

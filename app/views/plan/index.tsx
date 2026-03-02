@@ -1,10 +1,9 @@
-﻿"use client";
+"use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { isoToday } from "@/lib/constants";
+import { formatMinutes, isoToday } from "@/lib/constants";
 import { useAppStore } from "@/lib/store";
 import type { DailyPlan, Task } from "@/lib/types";
-import { selectAiBatchMeta } from "@/lib/selectors";
 import useAiGeneration from "@/app/hooks/useAiGeneration";
 import useBudgetDisplay from "@/app/hooks/useBudgetDisplay";
 import useStickyRegenBar from "@/app/hooks/useStickyRegenBar";
@@ -51,9 +50,12 @@ const createManualTask = (
   milestoneId: milestoneId || undefined,
 });
 
-const getAiBatchKey = (task: Task) => {
-  if (task.source !== "ai") return null;
-  return task.aiBatchId ?? `legacy-${task.milestoneId ?? "whole"}`;
+type PlanTaskGroup = {
+  key: string;
+  label: string;
+  tasks: Task[];
+  totalMinutes: number;
+  sortOrder: number;
 };
 
 export default function PlanView() {
@@ -87,6 +89,7 @@ export default function PlanView() {
   const [showMilestonePrompt, setShowMilestonePrompt] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const sidebarMilestoneSelectRef = useRef(false);
   const newestTaskRef = useRef<HTMLDivElement | null>(null);
   const planMilestoneByProject = ui.planMilestoneByProject ?? {};
@@ -115,18 +118,61 @@ export default function PlanView() {
   const budget =
     activePlan?.timeBudgetOverrideMinutes ?? selectedProject?.constraints.timeBudgetMinutes ?? 0;
   const hasBudgetOverride = typeof activePlan?.timeBudgetOverrideMinutes === "number";
-  const hasPlanTasks = planTasks.length > 0;
 
   const projectMilestones = useMemo(() => {
     if (!selectedProject) return [];
     return milestones.filter((milestone) => milestone.projectId === selectedProject.id);
   }, [milestones, selectedProject]);
+  const milestoneTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    projectMilestones.forEach((milestone, index) => {
+      map.set(milestone.id, milestone.title || `Milestone ${index + 1}`);
+    });
+    return map;
+  }, [projectMilestones]);
   const selectedMilestone = selectedMilestoneId
     ? projectMilestones.find((milestone) => milestone.id === selectedMilestoneId)
     : undefined;
-  const notesCharCount = planNotes.trim().length;
-  const hasManualDraft = !!manualTitle.trim();
+  const visiblePlanTasks = useMemo(() => {
+    if (!selectedMilestoneId) return planTasks;
+    return planTasks.filter((task) => task.milestoneId === selectedMilestoneId);
+  }, [planTasks, selectedMilestoneId]);
+  const visibleTaskGroups = useMemo(() => {
+    if (!visiblePlanTasks.length) return [] as PlanTaskGroup[];
+    const milestoneOrder = new Map(
+      projectMilestones.map((milestone, index) => [milestone.id, index]),
+    );
+    const groups = new Map<string, PlanTaskGroup>();
 
+    visiblePlanTasks.forEach((task) => {
+      const key = task.milestoneId || "__whole__";
+      const label = task.milestoneId
+        ? milestoneTitleById.get(task.milestoneId) ?? "Milestone"
+        : "Whole Project";
+      const sortOrder = task.milestoneId
+        ? (milestoneOrder.get(task.milestoneId) ?? 999)
+        : -1;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.tasks.push(task);
+        existing.totalMinutes += task.estimateMinutes;
+        return;
+      }
+      groups.set(key, {
+        key,
+        label,
+        tasks: [task],
+        totalMinutes: task.estimateMinutes,
+        sortOrder,
+      });
+    });
+
+    return Array.from(groups.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [milestoneTitleById, projectMilestones, visiblePlanTasks]);
+  const hasVisiblePlanTasks = visiblePlanTasks.length > 0;
+  const newestVisibleTaskId = hasVisiblePlanTasks
+    ? visiblePlanTasks[visiblePlanTasks.length - 1].id
+    : null;
   const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
 
   const {
@@ -174,12 +220,12 @@ export default function PlanView() {
   } = useStickyRegenBar(
     milestoneDropdownRef,
     ui.activeView,
-    hasPlanTasks,
+    hasVisiblePlanTasks,
     !!aiPrompt,
     !!regenBudgetMessage,
   );
 
-  const shouldShowStickyBar = showStickyRegen && !!selectedProject && hasPlanTasks;
+  const shouldShowStickyBar = showStickyRegen && !!selectedProject && hasVisiblePlanTasks;
 
   const regenDepsRef = useRef({
     totalPlanned,
@@ -315,33 +361,6 @@ export default function PlanView() {
     upsertDailyPlan({ ...activePlan, timeBudgetOverrideMinutes: undefined });
   };
 
-  const milestoneTitleById = useMemo(() => {
-    const map = new Map<string, string>();
-    projectMilestones.forEach((milestone) => map.set(milestone.id, milestone.title));
-    return map;
-  }, [projectMilestones]);
-
-  const aiBatchMeta = useMemo(
-    () => selectAiBatchMeta(planTasks, milestoneTitleById),
-    [planTasks, milestoneTitleById],
-  );
-  const planTaskRows = useMemo(() => {
-    const seenBatches = new Set<string>();
-    return planTasks.map((task, index) => {
-      const batchKey = getAiBatchKey(task);
-      const showBatchHeader = !!batchKey && !seenBatches.has(batchKey);
-      if (showBatchHeader && batchKey) {
-        seenBatches.add(batchKey);
-      }
-      return {
-        task,
-        batchMeta: batchKey ? aiBatchMeta.get(batchKey) : undefined,
-        showBatchHeader,
-        isNewestTask: index === planTasks.length - 1,
-      };
-    });
-  }, [aiBatchMeta, planTasks]);
-
   const handleGenerate = async (skipMilestonePrompt?: boolean) => {
     await handleGenerateTasks({
       notes: planNotes,
@@ -363,13 +382,13 @@ export default function PlanView() {
   }, [selectedMilestoneId]);
 
   useEffect(() => {
-    if (!pendingManualTaskScroll || planTasks.length === 0) return;
+    if (!pendingManualTaskScroll) return;
     const raf = window.requestAnimationFrame(() => {
       newestTaskRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       setPendingManualTaskScroll(false);
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [pendingManualTaskScroll, planTasks.length]);
+  }, [pendingManualTaskScroll, hasVisiblePlanTasks, selectedMilestoneId]);
 
   const handleRunAiGeneration = (remainingBudget: number, removeTaskIds: string[]) => {
     runAiGeneration(remainingBudget, removeTaskIds, planNotes);
@@ -377,47 +396,69 @@ export default function PlanView() {
 
   return (
     <section
-      className={`grid min-w-0 gap-6 rounded-[28px] bg-white/80 p-4 sm:p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] ${
-        selectedProject ? "pb-28" : ""
-      }`}
+      className={`grid min-w-0 gap-8 rounded-[32px] bg-[var(--panel)]/70 p-6 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl border border-[var(--paper)] ${selectedProject ? "pb-28" : ""
+        }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl mb-2">
-            Daily Plan for{" "}
-            <button
-              type="button"
-              onClick={() => {
-                window.dispatchEvent(new Event("open-left-sidebar"));
-              }}
-              className="font-semibold text-[var(--accent)] transition hover:opacity-80"
-            >
-              {selectedProject ? selectedProject.name : "your project"}
-            </button>
-          </h2>
-          <p className="text-sm text-[var(--muted)]">
-            Generate, review, and organize today&apos;s tasks and notes for one focused project.
-          </p>
+      <div className="grid min-w-0 gap-3">
+        <h2 className="text-[22px] font-semibold tracking-tight text-[var(--ink)]">
+          Daily Plan for{" "}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new Event("open-left-sidebar"));
+            }}
+            className="font-semibold text-[var(--accent)] transition hover:opacity-80"
+          >
+            {selectedProject ? selectedProject.name : "your project"}
+          </button>
+        </h2>
+
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[var(--border-medium)] bg-white/85 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              Working Scope
+            </p>
+            <div className="mt-1.5 flex min-w-0 items-center justify-between gap-3">
+              <span className="truncate text-sm font-semibold text-[var(--ink)]">
+                {selectedMilestone?.title || "Whole Project"}
+              </span>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open-left-sidebar"))}
+                className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)] transition hover:opacity-80"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border-medium)] bg-white/85 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              Time Budget
+            </p>
+            <div className="mt-1.5">
+              <BudgetBar
+                totalPlanned={totalPlanned}
+                budget={budget}
+                isOverBudget={isOverBudget}
+                budgetPercent={budgetPercent}
+                plannedTick={plannedTick}
+                budgetPulse={budgetPulse}
+                hasBudgetOverride={hasBudgetOverride}
+                showBudgetOverride={showBudgetOverride}
+                setShowBudgetOverride={setShowBudgetOverride}
+                budgetOverrideDraft={budgetOverrideDraft}
+                setBudgetOverrideDraft={setBudgetOverrideDraft}
+                onSaveOverride={handlePlanBudgetOverrideChange}
+                onClearOverride={clearPlanBudgetOverride}
+              />
+            </div>
+          </div>
         </div>
-        <BudgetBar
-          totalPlanned={totalPlanned}
-          budget={budget}
-          isOverBudget={isOverBudget}
-          budgetPercent={budgetPercent}
-          plannedTick={plannedTick}
-          budgetPulse={budgetPulse}
-          hasBudgetOverride={hasBudgetOverride}
-          showBudgetOverride={showBudgetOverride}
-          setShowBudgetOverride={setShowBudgetOverride}
-          budgetOverrideDraft={budgetOverrideDraft}
-          setBudgetOverrideDraft={setBudgetOverrideDraft}
-          onSaveOverride={handlePlanBudgetOverrideChange}
-          onClearOverride={clearPlanBudgetOverride}
-        />
       </div>
 
       {!selectedProject && (
-        <div className="rounded-2xl border border-dashed border-[rgba(15,23,42,0.2)] p-6 text-sm text-[var(--muted)]">
+        <div className="rounded-2xl border border-dashed border-[rgba(31,45,43,0.2)] p-6 text-sm text-[var(--muted)]">
           Select a project to build a plan.
         </div>
       )}
@@ -426,6 +467,7 @@ export default function PlanView() {
         <>
           <div className="flex flex-col gap-3">
             <MilestoneSelector
+              showScopeSelector={false}
               projectMilestones={projectMilestones}
               selectedMilestoneId={selectedMilestoneId}
               setSelectedMilestoneId={setSelectedMilestoneId}
@@ -447,74 +489,12 @@ export default function PlanView() {
               aiPromptRef={aiPromptRef}
             />
 
-            <div className="grid gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => {
-                    setShouldScrollToRegenMessage(true);
-                    handleGenerate();
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-white shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
-                  disabled={isGenerating}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="overflow-visible"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
-                    <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
-                  </svg>
-                  {isGenerating ? "Generating..." : "Generate Tasks"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsNotesOpen((prev) => !prev)}
-                  className="rounded-full border border-[var(--border-medium)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
-                >
-                  {isNotesOpen ? "Hide Notes" : "Today's Notes"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsManualOpen((prev) => !prev)}
-                  className="rounded-full border border-[var(--border-medium)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
-                >
-                  {isManualOpen ? "Hide Manual Task" : "Add Manual Task"}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--muted)]">
-                <span>
-                  Notes:{" "}
-                  <span className="font-medium text-[var(--ink)]">
-                    {notesCharCount > 0 ? `${notesCharCount} chars` : "empty"}
-                  </span>
-                </span>
-                <span>
-                  Manual draft:{" "}
-                  <span className="font-medium text-[var(--ink)]">
-                    {hasManualDraft ? "in progress" : "empty"}
-                  </span>
-                </span>
-                <span>Scope: {selectedMilestone?.title || "Whole Project"}</span>
-              </div>
-              <p className="text-xs text-[var(--muted)]">
-                Keep this area collapsed for focus, then expand only what you need.
-              </p>
-            </div>
-
             {isNotesOpen && (
               <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
                 <label className="text-sm font-semibold text-[var(--muted)]">
                   Today&apos;s Notes
                 </label>
-                <div className="relative flex min-w-0 items-center rounded-2xl bg-[var(--panel)] shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                <div className="relative flex min-w-0 items-center rounded-2xl bg-[var(--panel)] shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
                   <textarea
                     value={planNotes}
                     onChange={(event) => setPlanNotes(event.target.value)}
@@ -553,63 +533,130 @@ export default function PlanView() {
 
             {notesFromVoice && (
               <p className="text-xs text-[var(--muted)]">
-                Voice capture ready — use the header button to add it to notes.
+                Voice capture ready - use the header button to add it to notes.
               </p>
             )}
           </div>
 
           <div className="grid min-w-0 gap-3">
-            {planTasks.length === 0 && !isGenerating && (
-              <p className="text-sm text-[var(--muted)]">No tasks yet for this day.</p>
-            )}
-            {planTaskRows.map(({ task, batchMeta, showBatchHeader, isNewestTask }) => (
-              <Fragment key={task.id}>
-                {showBatchHeader && batchMeta && (
-                  <div className="rounded-full bg-[var(--panel)] px-4 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                    {batchMeta.label} ·{" "}
-                    {new Date(batchMeta.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setShouldScrollToRegenMessage(true);
+                  handleGenerate();
+                }}
+                className="flex items-center justify-center gap-2 rounded-full bg-[var(--ink)]/90 px-4 py-2 text-[13px] font-semibold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[var(--ink)] disabled:opacity-60"
+                disabled={isGenerating}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="overflow-visible" aria-hidden="true">
+                  <path d="m5 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+                  <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
+                </svg>
+                {hasVisiblePlanTasks ? "Generate More" : "Generate Tasks"}
+              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAddMenuOpen((prev) => !prev)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-hover)] text-[var(--muted)] transition hover:bg-[rgba(31,45,43,0.1)]"
+                  title="More actions"
+                  aria-label="More actions"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+                {addMenuOpen && (
+                  <div className="absolute left-0 bottom-full z-20 mb-2 w-48 rounded-xl border border-[var(--border-medium)] bg-[var(--panel)] p-1.5 shadow-lg backdrop-blur">
+                    <button
+                      type="button"
+                      onClick={() => { setIsManualOpen((prev) => !prev); setAddMenuOpen(false); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--ink)] transition hover:bg-[var(--bg-hover)]"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      {isManualOpen ? "Hide Manual Task" : "Add Manual Task"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsNotesOpen((prev) => !prev); setAddMenuOpen(false); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--ink)] transition hover:bg-[var(--bg-hover)]"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <polyline points="10 9 9 9 8 9" />
+                      </svg>
+                      {isNotesOpen ? "Hide Notes" : "Today's Notes"}
+                    </button>
                   </div>
                 )}
-                <div ref={isNewestTask ? newestTaskRef : undefined}>
-                  <TaskCard
-                    task={task}
-                    mode="plan"
-                    onStatusChange={updateTaskStatus}
-                    onEstimateChange={updateTaskEstimate}
-                    onTogglePin={toggleTaskPinned}
-                    onUpdateDetails={updateTaskDetails}
-                    onRemove={handleRemoveTask}
-                    onFocus={(id) => {
-                      setFocusTask(id);
-                      setView("focus");
-                    }}
-                    isRegenerating={regeneratingTaskIdSet.has(task.id)}
-                    isNewlyGenerated={newlyGeneratedTaskIdSet.has(task.id)}
-                  />
+              </div>
+            </div>
+            {!hasVisiblePlanTasks && !isGenerating && (
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                <p className="text-sm text-[var(--muted)]">
+                  {selectedMilestoneId
+                    ? `No tasks yet for "${selectedMilestone?.title ?? "this milestone"}".`
+                    : "No tasks yet."}
+                </p>
+              </div>
+            )}
+            {visibleTaskGroups.map((group) => (
+              <Fragment key={group.key}>
+                <div className="flex items-center justify-between rounded-full bg-[var(--panel)] px-4 py-1 text-xs font-medium tracking-wide text-[var(--muted)]">
+                  <span>{group.label}</span>
+                  <span>
+                    {group.tasks.length} tasks - {formatMinutes(group.totalMinutes)}
+                  </span>
                 </div>
+                {group.tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    ref={task.id === newestVisibleTaskId ? newestTaskRef : undefined}
+                  >
+                    <TaskCard
+                      task={task}
+                      mode="plan"
+                      onStatusChange={updateTaskStatus}
+                      onEstimateChange={updateTaskEstimate}
+                      onTogglePin={toggleTaskPinned}
+                      onUpdateDetails={updateTaskDetails}
+                      onRemove={handleRemoveTask}
+                      onFocus={(id) => {
+                        setFocusTask(id);
+                        setView("focus");
+                      }}
+                      isRegenerating={regeneratingTaskIdSet.has(task.id)}
+                      isNewlyGenerated={newlyGeneratedTaskIdSet.has(task.id)}
+                    />
+                  </div>
+                ))}
               </Fragment>
             ))}
             {isGenerating && (
               <>
-                <div className="flex items-center gap-2 rounded-2xl border border-dashed border-sky-300/80 bg-sky-50/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                <div className="flex items-center gap-2 rounded-2xl border border-dashed border-[rgba(95,143,162,0.45)] bg-[var(--info-soft)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--info)]">
                   <span
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-sky-300 border-t-sky-600"
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[rgba(95,143,162,0.32)] border-t-[var(--info)]"
                     aria-hidden="true"
                   />
                   Generating tasks for this list...
                 </div>
-                {Array.from({ length: planTasks.length === 0 ? 3 : 2 }).map((_, index) => (
+                {Array.from({ length: hasVisiblePlanTasks ? 2 : 3 }).map((_, index) => (
                   <div
                     key={`pending-generated-task-${index}`}
-                    className="grid gap-2 rounded-2xl border border-dashed border-sky-300/75 bg-white/85 px-4 py-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.5)] animate-pulse"
+                    className="grid gap-2 rounded-2xl border border-dashed border-[rgba(95,143,162,0.38)] bg-white/85 px-4 py-4 shadow-[0_12px_24px_-20px_rgba(31,45,43,0.42)] animate-pulse"
                     aria-hidden="true"
                   >
-                    <div className="h-2 w-1/3 rounded-full bg-slate-300/80" />
-                    <div className="h-2 w-11/12 rounded-full bg-slate-300/80" />
-                    <div className="h-2 w-2/3 rounded-full bg-slate-300/80" />
+                    <div className="h-2 w-1/3 rounded-full bg-[var(--border-medium)]" />
+                    <div className="h-2 w-11/12 rounded-full bg-[var(--border-medium)]" />
+                    <div className="h-2 w-2/3 rounded-full bg-[var(--border-medium)]" />
                   </div>
                 ))}
               </>

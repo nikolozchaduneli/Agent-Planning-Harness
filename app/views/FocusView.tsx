@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useAppStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
@@ -17,7 +17,7 @@ export default function FocusView() {
   const focusTask = tasks.find((task) => task.id === ui.focusTaskId);
 
   return (
-    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)]">
+    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(31,45,43,0.4)]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl">Focus view</h2>
@@ -31,7 +31,7 @@ export default function FocusView() {
         </button>
       </div>
       {!focusTask && (
-        <div className="rounded-[24px] border border-dashed border-[rgba(15,23,42,0.2)] bg-white/70 p-6">
+        <div className="rounded-[24px] border border-dashed border-[rgba(31,45,43,0.2)] bg-white/70 p-6">
           <p className="text-sm text-[var(--muted)]">No focus task. Pick one from the plan.</p>
         </div>
       )}

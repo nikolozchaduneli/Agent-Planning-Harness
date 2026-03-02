@@ -1,6 +1,6 @@
 # App Flow
 
-Last updated: 2026-02-25
+Last updated: 2026-03-01
 Source of truth: current implementation in `app/*` and `lib/*`.
 
 ## Canonical User Flows
@@ -55,7 +55,9 @@ Flow list:
 - Viewing project goal + computed progress
 - Manual milestone create + complete toggle
 - AI milestone proposal (`useAiGeneration().handleProposeMilestones`)
-- Milestone click in sidebar dispatches `planning-milestone-select` to Plan.
+- Milestone row click in sidebar dispatches `planning-milestone-select` to Plan (changes active scope).
+- Milestones section title click opens Settings and jumps to Milestones editor (`open-settings-milestones`).
+- Each milestone now has `title` + optional `description`; descriptions are editable in Settings and AI generation/regeneration returns both fields.
 
 ## 5. Daily plan lifecycle
 - Plan screen is `app/views/plan/index.tsx`.
@@ -82,7 +84,7 @@ Flow list:
 
 ## 7. AI task generation and regenerate behavior
 - Client orchestration lives in `app/hooks/useAiGeneration.ts`.
-- Generate request goes to `POST /api/ai/generate-tasks` with goal, project name, selected milestone title (optional), full milestone list, constraints, time budget, and notes.
+- Generate request goes to `POST /api/ai/generate-tasks` with goal, project name, selected milestone title (optional), full milestone list (including milestone descriptions), constraints, time budget, and notes.
 - Milestone gating:
 - If project has no milestones, Plan shows a prompt to add/propose milestones or continue with Whole Project.
 - Regeneration logic is scope-aware (selected milestone or whole project):
@@ -133,3 +135,4 @@ Flow list:
 ## 12. Settings project switching and creation
 - Settings view (`app/views/settings/index.tsx`) shows `CreateProjectForm` whenever no project is selected.
 - `Start New Project` clears `ui.selectedProjectId`, immediately exposing the creation form even when other projects already exist.
+- Settings Milestones section supports optional AI steering notes plus `Regenerate Milestones`, and applies generated titles while preserving milestones still referenced by tasks.

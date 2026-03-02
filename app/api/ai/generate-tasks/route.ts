@@ -10,6 +10,7 @@ const requestSchema = z.object({
     .array(
       z.object({
         title: z.string().min(1),
+        description: z.string().optional(),
         status: z.enum(["active", "completed"]).optional(),
       }),
     )
@@ -168,17 +169,43 @@ const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
   const focusNotes = payload.constraints.focusNotes?.trim();
   const budget = payload.timeBudgetMinutes ?? payload.constraints.timeBudgetMinutes;
   const milestoneContext = payload.milestoneTitle ? `\nTarget Milestone: ${payload.milestoneTitle}` : "";
-  const milestoneList = payload.milestones?.map((m) => m.title.trim()).filter(Boolean) ?? [];
+  const milestoneDetails =
+    payload.milestones
+      ?.map((milestone) => {
+        const title = milestone.title.trim();
+        if (!title) return null;
+        const description = milestone.description?.trim() || "";
+        return { title, description };
+      })
+      .filter((milestone): milestone is { title: string; description: string } => !!milestone) ?? [];
+  const milestoneList = milestoneDetails.map((milestone) => milestone.title);
+  const milestoneDetailsContext =
+    milestoneDetails.length > 0
+      ? `\nMilestones with scope details:\n${milestoneDetails
+        .map((milestone) =>
+          `- ${milestone.title}: ${milestone.description || "No description provided."}`,
+        )
+        .join("\n")}`
+      : "";
   const otherMilestones = payload.milestoneTitle
     ? milestoneList.filter((title) => title !== payload.milestoneTitle)
     : [];
+  const otherMilestoneDetails = milestoneDetails.filter(
+    (milestone) => !payload.milestoneTitle || milestone.title !== payload.milestoneTitle,
+  );
   const milestonesContext =
     milestoneList.length > 0
       ? `\nAll milestones: ${milestoneList.join(" | ")}`
       : "";
   const otherMilestonesContext =
-    otherMilestones.length > 0
-      ? `\nOther milestones (avoid overlap): ${otherMilestones.join(" | ")}`
+    otherMilestoneDetails.length > 0
+      ? `\nOther milestones (avoid overlap): ${otherMilestoneDetails
+        .map((milestone) =>
+          milestone.description
+            ? `${milestone.title} (${milestone.description})`
+            : milestone.title,
+        )
+        .join(" | ")}`
       : "";
   const forbiddenMilestonesContext =
     otherMilestones.length > 0
@@ -190,12 +217,16 @@ const buildPrompt = (payload: z.infer<typeof requestSchema>) => {
       : "";
   return `
 Project: ${payload.projectName || 'Unspecified'}
-Goal: ${payload.goal}${milestoneContext}${milestonesContext}${otherMilestonesContext}${forbiddenMilestonesContext}${milestoneAssignmentContext}
+Goal: ${payload.goal}${milestoneContext}${milestonesContext}${milestoneDetailsContext}${otherMilestonesContext}${forbiddenMilestonesContext}${milestoneAssignmentContext}
 Time budget (minutes): ${budget ?? "unspecified"}
 Focus notes: ${focusNotes || "none"}
 User notes: ${payload.notes?.trim() || "none"}
 
 Create a concise list of tasks with realistic time estimates. Keep tasks actionable and ordered.
+Think hard before responding: reason carefully about dependencies, sequencing, and budget fit.
+Use milestone descriptions to enforce strict scope boundaries.
+For a target milestone, generate only tasks that directly advance that milestone's described outcome.
+Avoid tasks whose outcome belongs to another milestone's description.
 If a target milestone is provided, keep tasks tightly scoped to it and avoid tasks that belong to other milestones.
 If a target milestone is provided, set milestoneTitle to that exact milestone for every task.
 If no target milestone is provided and milestones are listed, set milestoneTitle for every task to one of the listed milestones.
@@ -245,7 +276,36 @@ const getOutputText = (data: unknown) => {
   return null;
 };
 
+const getReasoningTokens = (data: unknown): number | undefined => {
+  if (!data || typeof data !== "object") return undefined;
+  const usage = (data as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const outputDetails = (usage as { output_tokens_details?: unknown }).output_tokens_details;
+  if (!outputDetails || typeof outputDetails !== "object") return undefined;
+  const reasoningTokens = (outputDetails as { reasoning_tokens?: unknown }).reasoning_tokens;
+  return typeof reasoningTokens === "number" ? reasoningTokens : undefined;
+};
+
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
+  const createDebugMeta = (
+    overrides: Partial<{
+      fallback: boolean;
+      fallbackReason: string;
+      reasoningFieldUsed: "reasoning.effort" | "none";
+      reasoningTokens: number;
+      reasoningAttemptErrors: Array<{
+        label: "reasoning.effort" | "none";
+        status: number;
+        errorSnippet: string;
+      }>;
+    }> = {},
+  ) => ({
+    latencyMs: Date.now() - requestStartedAt,
+    reasoningEffortRequested: "high",
+    ...overrides,
+  });
+
   const body = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
 
@@ -286,6 +346,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       tasks: fallback.tasks,
       ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+      meta: createDebugMeta({
+        fallback: true,
+        fallbackReason: "missing_ai_config",
+        reasoningFieldUsed: "none",
+      }),
     });
   }
 
@@ -337,34 +402,72 @@ export async function POST(request: Request) {
   };
 
   try {
-    const response = await fetch(requestUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        instructions:
-          "You are an expert project planner. Return only the JSON that matches the provided schema.",
-        input: buildPrompt(parsed.data),
-        model: deployment,
-        temperature: 0.2,
-        text: {
-          format: {
-            type: "json_schema",
-            name: schema.name,
-            strict: schema.strict,
-            schema: schema.schema,
-          },
+    const requestBase = {
+      instructions:
+        "You are an expert project planner. Return only the JSON that matches the provided schema.",
+      input: buildPrompt(parsed.data),
+      model: deployment,
+      text: {
+        format: {
+          type: "json_schema" as const,
+          name: schema.name,
+          strict: schema.strict,
+          schema: schema.schema,
         },
-      }),
-    });
+      },
+    };
 
-    if (!response.ok) {
+    const requestVariants: Array<{
+      label: "reasoning.effort" | "none";
+      body: Record<string, unknown>;
+    }> = [
+      { label: "reasoning.effort", body: { ...requestBase, reasoning: { effort: "high" } } },
+      { label: "none", body: { ...requestBase, temperature: 0.2 } },
+    ];
+
+    let response: Response | null = null;
+    let reasoningFieldUsed: "reasoning.effort" | "none" = "none";
+    let lastErrorBody = "";
+    const reasoningAttemptErrors: Array<{
+      label: "reasoning.effort" | "none";
+      status: number;
+      errorSnippet: string;
+    }> = [];
+
+    for (const variant of requestVariants) {
+      const attempt = await fetch(requestUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey,
+        },
+        body: JSON.stringify(variant.body),
+      });
+      if (attempt.ok) {
+        response = attempt;
+        reasoningFieldUsed = variant.label;
+        break;
+      }
+      lastErrorBody = await attempt.text();
+      reasoningAttemptErrors.push({
+        label: variant.label,
+        status: attempt.status,
+        errorSnippet: lastErrorBody.slice(0, 260),
+      });
+    }
+
+    if (!response) {
+      console.error("Task generation call failed", lastErrorBody);
       const fallback = getBudgetedFallback();
       return NextResponse.json({
         tasks: fallback.tasks,
         ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+        meta: createDebugMeta({
+          fallback: true,
+          fallbackReason: "all_request_variants_failed",
+          reasoningFieldUsed,
+          reasoningAttemptErrors,
+        }),
       });
     }
 
@@ -375,6 +478,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         tasks: fallback.tasks,
         ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+        meta: createDebugMeta({
+          fallback: true,
+          fallbackReason: "empty_or_invalid_output_text",
+          reasoningFieldUsed,
+          reasoningTokens: getReasoningTokens(data),
+          reasoningAttemptErrors,
+        }),
       });
     }
 
@@ -386,6 +496,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         tasks: fallback.tasks,
         ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+        meta: createDebugMeta({
+          fallback: true,
+          fallbackReason: "unparseable_model_json",
+          reasoningFieldUsed,
+          reasoningTokens: getReasoningTokens(data),
+          reasoningAttemptErrors,
+        }),
       });
     }
     const validated = responseSchema.safeParse(payload);
@@ -394,6 +511,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         tasks: fallback.tasks,
         ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+        meta: createDebugMeta({
+          fallback: true,
+          fallbackReason: "schema_validation_failed",
+          reasoningFieldUsed,
+          reasoningTokens: getReasoningTokens(data),
+          reasoningAttemptErrors,
+        }),
       });
     }
 
@@ -442,12 +566,23 @@ export async function POST(request: Request) {
       tasks: budgeted.tasks,
       ...(filteredCount > 0 ? { scopeWarning: { filteredCount } } : {}),
       ...(budgeted.droppedCount > 0 ? { budgetWarning: { droppedCount: budgeted.droppedCount } } : {}),
+      meta: createDebugMeta({
+        fallback: false,
+        reasoningFieldUsed,
+        reasoningTokens: getReasoningTokens(data),
+        reasoningAttemptErrors,
+      }),
     });
   } catch {
     const fallback = getBudgetedFallback();
     return NextResponse.json({
       tasks: fallback.tasks,
       ...(fallback.droppedCount > 0 ? { budgetWarning: { droppedCount: fallback.droppedCount } } : {}),
+      meta: createDebugMeta({
+        fallback: true,
+        fallbackReason: "unexpected_route_error",
+        reasoningFieldUsed: "none",
+      }),
     });
   }
 }

@@ -11,7 +11,7 @@ const styles = {
   toggleButton:
     "flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   aside:
-    "no-scrollbar flex h-full w-full flex-col overflow-hidden bg-white/60 shadow-sm transition-all duration-500 ease-out",
+    "no-scrollbar flex h-full w-full flex-col overflow-hidden bg-transparent transition-all duration-500 ease-out",
 };
 
 type RightSidebarProps = {
@@ -60,11 +60,10 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
   return (
     <div className={`${styles.wrapper} ${isOpen ? "w-72" : "w-0"}`}>
       <aside
-        className={`${styles.aside} ${
-          isOpen
-            ? "translate-x-0 border-l border-[var(--border-subtle)] p-3 opacity-100"
-            : "translate-x-6 border-l-0 p-0 opacity-0 pointer-events-none"
-        }`}
+        className={`${styles.aside} ${isOpen
+          ? "translate-x-0 border-l border-[var(--border-subtle)] p-3 opacity-100"
+          : "translate-x-6 border-l-0 p-0 opacity-0 pointer-events-none"
+          }`}
       >
         <>
           <div className="mb-6 mt-1.5 flex items-center justify-between gap-2">
@@ -75,20 +74,18 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
               </h3>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] shadow">
+              <div className="flex items-center gap-1 rounded-full bg-white px-1 py-0.5 text-[11px] font-medium tracking-wide shadow-sm">
                 <button
                   onClick={() => setShowAllActivity(false)}
-                  className={`rounded-full px-2 py-1 ${
-                    !showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"
-                  }`}
+                  className={`rounded-full px-2 py-1 ${!showAllActivity ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"
+                    }`}
                 >
                   Today
                 </button>
                 <button
                   onClick={() => setShowAllActivity(true)}
-                  className={`rounded-full px-2 py-1 ${
-                    showAllActivity ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"
-                  }`}
+                  className={`rounded-full px-2 py-1 ${showAllActivity ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"
+                    }`}
                 >
                   All
                 </button>
@@ -111,7 +108,7 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
                   <button
                     type="button"
                     onClick={() => setShowAllActivity(true)}
-                    className="w-fit rounded-full border border-[var(--border-medium)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ink)] transition hover:-translate-y-0.5"
+                    className="w-fit rounded-full border border-[var(--border-medium)] bg-white px-3 py-1 text-xs font-medium text-[var(--ink)] transition hover:-translate-y-0.5"
                   >
                     View all activity
                   </button>
@@ -121,10 +118,10 @@ export default function RightSidebar({ isOpen, onToggle }: RightSidebarProps) {
             {selectedProject &&
               scopedActivities.map((activity) => (
                 <div key={activity.id} className="flex gap-3 text-sm">
-                  <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]" />
+                  <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full border-[2px] border-[var(--border-medium)] bg-white" />
                   <div className="min-w-0">
                     <p className="break-words text-[var(--ink)]">{activity.description}</p>
-                    <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-[var(--muted)]">
+                    <p className="mt-0.5 text-[11px] text-[var(--muted)]">
                       {new Date(activity.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",

@@ -3,6 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 
+const getScrollParent = (element: HTMLElement): HTMLElement | null => {
+  let parent = element.parentElement;
+  while (parent) {
+    const styles = window.getComputedStyle(parent);
+    const isScrollableY = /(auto|scroll|overlay)/.test(styles.overflowY);
+    if (isScrollableY && parent.scrollHeight > parent.clientHeight) {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
+};
+
 export default function useStickyRegenBar(
   milestoneDropdownRef: RefObject<HTMLDivElement | null>,
   activeView: string,
@@ -19,19 +32,43 @@ export default function useStickyRegenBar(
   const focusHighlightTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (activeView !== "plan") return;
-    if (!milestoneDropdownRef.current) return;
+    if (activeView !== "plan" || !hasPlanTasks) return;
 
-    const target = milestoneDropdownRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyRegen(!entry.isIntersecting);
-      },
-      { root: null, threshold: 0 },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [activeView, milestoneDropdownRef]);
+    let frameId = 0;
+    let observer: IntersectionObserver | null = null;
+    let cancelled = false;
+
+    const setupObserver = () => {
+      if (cancelled) return;
+      const target = milestoneDropdownRef.current;
+      if (!target) {
+        frameId = window.requestAnimationFrame(setupObserver);
+        return;
+      }
+
+      const scrollRoot = getScrollParent(target);
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          setShowStickyRegen(!entry.isIntersecting);
+        },
+        {
+          root: scrollRoot,
+          threshold: 0,
+          // Header overlays top content, so treat that area as out of view.
+          rootMargin: "-64px 0px 0px 0px",
+        },
+      );
+      observer.observe(target);
+    };
+
+    setupObserver();
+
+    return () => {
+      cancelled = true;
+      if (frameId) window.cancelAnimationFrame(frameId);
+      observer?.disconnect();
+    };
+  }, [activeView, hasPlanTasks, milestoneDropdownRef]);
 
   useEffect(() => {
     if (!shouldScrollToRegenMessage) return;

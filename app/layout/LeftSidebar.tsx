@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/lib/store";
@@ -13,11 +13,11 @@ const styles = {
   toggleButton:
     "absolute top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5",
   aside:
-    "no-scrollbar flex h-full min-h-0 w-full flex-col gap-6 overflow-y-auto bg-white/60 shadow-sm transition-all duration-600 ease-out md:overflow-hidden",
+    "no-scrollbar flex h-full min-h-0 w-full flex-col gap-6 overflow-y-auto bg-transparent transition-all duration-600 ease-out md:overflow-hidden",
   dropdownButton:
-    "flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
+    "flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent bg-[var(--panel)] px-4 py-3 text-sm shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
   dropdownPanel:
-    "absolute left-0 right-0 z-20 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-[rgba(15,23,42,0.08)] bg-white/95 p-2 shadow-lg backdrop-blur",
+    "absolute left-0 right-0 z-20 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-[rgba(31,45,43,0.08)] bg-white/95 p-2 shadow-lg backdrop-blur",
   dropdownItem:
     "flex w-full items-start justify-between gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ink)] text-left transition hover:bg-[var(--panel)]",
 };
@@ -67,6 +67,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
   const dropdownPanelRef = useRef<HTMLDivElement | null>(null);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState("");
   const [showFullGoal, setShowFullGoal] = useState(false);
+  const [showMilestoneInput, setShowMilestoneInput] = useState(false);
   const [planningMilestoneId, setPlanningMilestoneId] = useState<string>("");
   const newMilestoneInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -108,6 +109,13 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
     setNewMilestoneTitle("");
   };
 
+  const openMilestonesInSettings = () => {
+    setView("projects");
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("open-settings-milestones"));
+    }, 0);
+  };
+
   const projectProgress = useMemo(() => {
     if (!selectedProject) return null;
     const projectTasks = tasks.filter(
@@ -128,8 +136,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
     <div className={`${styles.wrapper} ${isOpen ? "w-[min(360px,92vw)] sm:w-[360px]" : "w-12"}`}>
       <button
         onClick={onToggle}
-        className={`${styles.toggleButton} ${isOpen ? "right-2" : "left-1/2 -translate-x-[32%]"
-          }`}
+        className={`${styles.toggleButton} left-3 top-4`}
         title={isOpen ? "Hide sidebar" : "Show sidebar"}
         aria-label={isOpen ? "Hide sidebar" : "Show sidebar"}
       >
@@ -214,7 +221,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                           {formatProjectName(project.name)}
                         </span>
                         {ui.selectedProjectId === project.id && (
-                          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                          <span className="text-xs font-medium text-[var(--muted)]">
                             Active
                           </span>
                         )}
@@ -231,12 +238,12 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
           <>
             <div className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
-                <div className="relative">
+                <div className="relative min-w-0 flex-1">
                   <button
                     ref={activeProjectButtonRef}
                     id="active-project-select"
                     type="button"
-                    className="group flex w-full items-start justify-between gap-2 rounded-lg -mx-1 px-1 py-0.5 text-left text-2xl font-bold font-serif leading-tight tracking-[-0.02em] text-[var(--ink)] transition hover:shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className="group flex w-full items-start justify-between gap-2 rounded-lg -mx-1 px-1 py-0.5 text-left text-lg font-semibold leading-tight tracking-tight text-[var(--ink)] transition hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                     onClick={() => setShowNameDropdown((prev) => !prev)}
                   >
                     <span className="min-w-0 flex-1 break-words whitespace-normal">
@@ -258,7 +265,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                     </svg>
                   </button>
                   {showNameDropdown && (
-                    <div ref={dropdownPanelRef} className={`${styles.dropdownPanel} w-full`}>
+                    <div ref={dropdownPanelRef} className={`${styles.dropdownPanel} w-[calc(100%+32px)]`}>
                       {projects.map((project) => (
                         <button
                           key={project.id}
@@ -274,7 +281,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                             {formatProjectName(project.name)}
                           </span>
                           {ui.selectedProjectId === project.id && (
-                            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                            <span className="text-xs font-medium text-[var(--muted)]">
                               Active
                             </span>
                           )}
@@ -285,7 +292,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                 </div>
                 <button
                   onClick={() => setView("projects")}
-                  className="flex shrink-0 items-center justify-center rounded-full bg-[var(--bg-hover)] p-1.5 text-[var(--muted)] transition hover:bg-[rgba(15,23,42,0.08)] hover:text-[var(--ink)]"
+                  className="flex shrink-0 items-center justify-center rounded-full bg-[var(--bg-hover)] p-1.5 text-[var(--muted)] transition hover:bg-[rgba(31,45,43,0.08)] hover:text-[var(--ink)]"
                   title="Edit Project Settings"
                 >
                   <svg
@@ -305,29 +312,29 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
               </div>
               <div className="flex flex-col gap-2">
                 <p
-                  className={`text-sm text-[var(--muted)] break-words ${showFullGoal ? "" : "line-clamp-4"
+                  className={`text-sm text-[var(--muted)] break-words ${showFullGoal ? "" : "line-clamp-1"
                     }`}
                 >
                   {selectedProject.goal}
                 </p>
-                {selectedProject.goal.length > 200 && (
+                {selectedProject.goal.length > 100 && (
                   <button
                     type="button"
                     onClick={() => setShowFullGoal((prev) => !prev)}
-                    className="w-fit text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] transition hover:opacity-80"
+                    className="w-fit text-xs font-medium text-[var(--accent)] transition hover:opacity-80"
                   >
                     {showFullGoal ? "Show less" : "Show more"}
                   </button>
                 )}
               </div>
 
-              <div className="mt-2 rounded-xl border border-[rgba(15,23,42,0.05)] bg-white p-3 shadow-sm">
+              <div className="mt-2 rounded-xl border border-[rgba(31,45,43,0.05)] bg-white p-3 shadow-sm">
                 <p className="text-sm font-semibold text-[var(--muted)]">
                   Progress
                 </p>
                 {projectProgress && (
                   <>
-                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[rgba(15,23,42,0.08)]">
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--border-medium)]">
                       <div
                         className="h-2 rounded-full bg-[var(--accent)] transition-all"
                         style={{ width: `${projectProgress.pct}%` }}
@@ -343,14 +350,20 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
 
             <div className="grid gap-3 pb-1 md:flex md:min-h-0 md:flex-1 md:flex-col">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[var(--muted)]">
+                <button
+                  type="button"
+                  onClick={openMilestonesInSettings}
+                  className="text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
+                  title="Open milestone editor in Settings"
+                >
                   Milestones
-                </h3>
+                </button>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleProposeMilestones}
                     disabled={isGeneratingMilestones}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:opacity-80 transition disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded border border-[var(--border-medium)] bg-[var(--panel)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)] transition hover:bg-white disabled:opacity-50"
+                    title="Generates milestones from the project description and goal."
                   >
                     <svg
                       width="12"
@@ -368,13 +381,6 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                       <path d="m19 5 1 3 3 1-3 1-1 3-1-3-3-1 3-1z" />
                     </svg>
                     {isGeneratingMilestones ? "Thinking..." : "AI Propose"}
-                  </button>
-                  <button
-                    type="button"
-                    title="Generates milestones from the project description and goal."
-                    className="flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(15,23,42,0.18)] text-[10px] font-bold text-[var(--muted)] transition hover:border-[rgba(15,23,42,0.35)] hover:text-[var(--ink)]"
-                  >
-                    ?
                   </button>
                 </div>
               </div>
@@ -399,11 +405,11 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                           );
                         }
                       }}
-                      className={`flex items-start gap-2 rounded-lg border p-2.5 text-sm transition cursor-pointer hover:border-[rgba(15,23,42,0.15)] hover:bg-[rgba(15,23,42,0.02)] ${milestone.status === "completed"
-                        ? "border-[rgba(15,23,42,0.05)] bg-white/50 opacity-60"
+                      className={`group flex items-start gap-3 rounded-r-lg border-l-[3px] py-2.5 pr-2.5 pl-3 text-sm transition cursor-pointer hover:bg-[var(--bg-hover)] ${milestone.status === "completed"
+                        ? "border-transparent opacity-60"
                         : planningMilestoneId === milestone.id
-                          ? "border-[var(--accent)] bg-[rgba(249,115,22,0.08)] shadow-sm"
-                          : "border-[rgba(15,23,42,0.05)] bg-white shadow-sm"
+                          ? "border-[var(--accent)] bg-[rgba(76,143,132,0.12)]"
+                          : "border-transparent"
                         }`}
                     >
                       <input
@@ -416,62 +422,73 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
                           )
                         }
                         onClick={(event) => event.stopPropagation()}
-                        className="mt-0.5 rounded border-gray-300 text-[var(--accent)]"
+                        className="mt-0.5 rounded border-[var(--border-medium)] text-[var(--accent)]"
                       />
-                      <div className="flex flex-1 items-start justify-between gap-2">
-                        <span className={milestone.status === "completed" ? "line-through" : ""}>
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className={`min-w-0 line-clamp-1 ${milestone.status === "completed" ? "line-through opacity-70" : ""}`}>
                           {milestone.title}
                         </span>
                         {planningMilestoneId === milestone.id && (
-                          <span className="rounded-full border border-[var(--accent)]/40 bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">
-                            Planning
+                          <span className="shrink-0 rounded-full bg-[rgba(76,143,132,0.16)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent)]">
+                            Active
                           </span>
                         )}
                       </div>
                     </div>
                   ))}
               </div>
-              <div className="mt-1 grid gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1 flex items-center">
-                    <input
-                      id="new-milestone-input"
-                      type="text"
-                      placeholder="New milestone..."
-                      ref={newMilestoneInputRef}
-                      value={newMilestoneTitle}
-                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddMilestone();
-                      }}
-                      className="w-full rounded-lg border-transparent bg-white px-3 py-2 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                    />
-                    <div className="absolute right-1">
-                      <DictationMic
-                        isRecording={activeRecordingField === "newMilestone"}
-                        onClick={() => {
-                          if (activeRecordingField === "newMilestone") stopRecording();
-                          else
-                            startRecording(
-                              "newMilestone",
-                              (text) => setNewMilestoneTitle(text),
-                              "Context: I am adding a new milestone to the project.",
-                            );
-                        }}
-                      />
-                    </div>
-                  </div>
+              <div className="mt-1">
+                {!showMilestoneInput ? (
                   <button
                     type="button"
-                    onClick={handleAddMilestone}
-                    className="rounded-full bg-[var(--accent)] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:-translate-y-0.5"
+                    onClick={() => {
+                      setShowMilestoneInput(true);
+                      setTimeout(() => newMilestoneInputRef.current?.focus(), 50);
+                    }}
+                    className="text-xs font-medium text-[var(--accent)] transition hover:opacity-80"
                   >
-                    Add
+                    + Add milestone
                   </button>
-                </div>
-                <p className="text-[11px] text-[var(--muted)]">
-                  Press Enter or click Add to create a milestone
-                </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 flex items-center">
+                      <input
+                        id="new-milestone-input"
+                        type="text"
+                        placeholder="New milestone..."
+                        ref={newMilestoneInputRef}
+                        value={newMilestoneTitle}
+                        onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddMilestone();
+                          if (e.key === "Escape") setShowMilestoneInput(false);
+                        }}
+                        className="w-full rounded-lg border-transparent bg-white px-3 py-2 pr-10 text-sm shadow-[0_0_0_1px_rgba(31,45,43,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      />
+                      <div className="absolute right-1">
+                        <DictationMic
+                          isRecording={activeRecordingField === "newMilestone"}
+                          onClick={() => {
+                            if (activeRecordingField === "newMilestone") stopRecording();
+                            else
+                              startRecording(
+                                "newMilestone",
+                                (text) => setNewMilestoneTitle(text),
+                                "Context: I am adding a new milestone to the project.",
+                              );
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddMilestone}
+                      className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold tracking-wide text-white shadow-sm transition hover:-translate-y-0.5"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>

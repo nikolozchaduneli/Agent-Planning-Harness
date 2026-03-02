@@ -1,17 +1,78 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #0f172a;
-  --paper: #f5f1e8;
-  --accent: #f97316;
-  --accent-2: #0ea5e9;
-  --panel: #fffaf2;
-  --muted: #7c6f5b;
-  --ring: rgba(249, 115, 22, 0.35);
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-medium: rgba(15, 23, 42, 0.12);
-  --border-strong: rgba(15, 23, 42, 0.32);
-  --bg-hover: rgba(15, 23, 42, 0.04);
+  --ink: #1f2d2b;
+  --paper: #edf4f1;
+  --accent: #4c8f84;
+  --accent-2: #6f9fb2;
+  --panel: #f7fbf9;
+  --muted: #60726d;
+  --ring: rgba(76, 143, 132, 0.32);
+  --border-subtle: rgba(31, 45, 43, 0.08);
+  --border-medium: rgba(31, 45, 43, 0.14);
+  --border-strong: rgba(31, 45, 43, 0.3);
+  --bg-hover: rgba(31, 45, 43, 0.05);
+  --success: #5f977a;
+  --success-soft: rgba(95, 151, 122, 0.16);
+  --warning: #b28b5f;
+  --warning-soft: rgba(178, 139, 95, 0.2);
+  --info: #5f8fa2;
+  --info-soft: rgba(95, 143, 162, 0.16);
+  --bg-orb-a: rgba(111, 159, 178, 0.19);
+  --bg-orb-b: rgba(76, 143, 132, 0.16);
+  --bg-base-a: #f4f8f6;
+  --bg-base-b: #edf4f1;
+  --bg-base-c: #f2f8f5;
+}
+
+:root[data-theme="mist"] {
+  --ink: #253240;
+  --paper: #edf2f8;
+  --accent: #5f86a4;
+  --accent-2: #77a6a1;
+  --panel: #f7f9fc;
+  --muted: #637284;
+  --ring: rgba(95, 134, 164, 0.34);
+  --border-subtle: rgba(37, 50, 64, 0.08);
+  --border-medium: rgba(37, 50, 64, 0.14);
+  --border-strong: rgba(37, 50, 64, 0.3);
+  --bg-hover: rgba(37, 50, 64, 0.05);
+  --success: #5b9384;
+  --success-soft: rgba(91, 147, 132, 0.16);
+  --warning: #b58f62;
+  --warning-soft: rgba(181, 143, 98, 0.2);
+  --info: #5f86a4;
+  --info-soft: rgba(95, 134, 164, 0.16);
+  --bg-orb-a: rgba(119, 166, 161, 0.2);
+  --bg-orb-b: rgba(95, 134, 164, 0.18);
+  --bg-base-a: #f2f6fb;
+  --bg-base-b: #ebf1f7;
+  --bg-base-c: #f4f8fc;
+}
+
+:root[data-theme="dawn"] {
+  --ink: #2f3329;
+  --paper: #f6f1e6;
+  --accent: #8f8661;
+  --accent-2: #8fa98c;
+  --panel: #fcf8ef;
+  --muted: #736f5a;
+  --ring: rgba(143, 134, 97, 0.34);
+  --border-subtle: rgba(47, 51, 41, 0.08);
+  --border-medium: rgba(47, 51, 41, 0.15);
+  --border-strong: rgba(47, 51, 41, 0.3);
+  --bg-hover: rgba(47, 51, 41, 0.05);
+  --success: #7f9d75;
+  --success-soft: rgba(127, 157, 117, 0.16);
+  --warning: #a97c5f;
+  --warning-soft: rgba(169, 124, 95, 0.2);
+  --info: #7a9a8f;
+  --info-soft: rgba(122, 154, 143, 0.16);
+  --bg-orb-a: rgba(143, 169, 140, 0.2);
+  --bg-orb-b: rgba(143, 134, 97, 0.17);
+  --bg-base-a: #fbf6ed;
+  --bg-base-b: #f4efe3;
+  --bg-base-c: #fbf5ea;
 }
 
 @theme inline {
@@ -27,7 +88,7 @@
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+  scrollbar-color: rgba(31, 45, 43, 0.16) transparent;
 }
 
 html::-webkit-scrollbar {
@@ -40,12 +101,12 @@ html::-webkit-scrollbar-track {
 }
 
 html::-webkit-scrollbar-thumb {
-  background-color: rgba(15, 23, 42, 0.18);
+  background-color: rgba(31, 45, 43, 0.16);
   border-radius: 999px;
 }
 
 html::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(15, 23, 42, 0.28);
+  background-color: rgba(31, 45, 43, 0.28);
 }
 
 body {
@@ -54,9 +115,9 @@ body {
   overflow: hidden;
   color: var(--ink);
   background:
-    radial-gradient(900px 600px at 10% 10%, rgba(14, 165, 233, 0.15), transparent 55%),
-    radial-gradient(700px 500px at 90% 0%, rgba(249, 115, 22, 0.18), transparent 60%),
-    linear-gradient(135deg, #fdf8ee 0%, #f4efe5 45%, #f7f2e7 100%);
+    radial-gradient(950px 620px at 12% 8%, var(--bg-orb-a), transparent 56%),
+    radial-gradient(760px 540px at 88% 0%, var(--bg-orb-b), transparent 60%),
+    linear-gradient(135deg, var(--bg-base-a) 0%, var(--bg-base-b) 45%, var(--bg-base-c) 100%);
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
 }
 
@@ -121,9 +182,9 @@ input[type="radio"] {
 }
 
 .attention-highlight {
-  outline: 2px solid rgba(249, 115, 22, 0.75);
+  outline: 2px solid rgba(76, 143, 132, 0.72);
   outline-offset: 2px;
-  box-shadow: 0 8px 20px -16px rgba(249, 115, 22, 0.65);
+  box-shadow: 0 8px 20px -16px rgba(76, 143, 132, 0.62);
   animation: attention-shake 0.7s ease-in-out;
 }
 
@@ -160,16 +221,16 @@ input[type="radio"] {
 
 @keyframes task-generated-glow {
   0% {
-    box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.6);
-    border-color: rgba(15, 23, 42, 0.32);
+    box-shadow: 0 14px 28px -18px rgba(31, 45, 43, 0.45);
+    border-color: rgba(31, 45, 43, 0.28);
   }
   35% {
-    box-shadow: 0 18px 30px -18px rgba(14, 165, 233, 0.45);
-    border-color: rgba(14, 165, 233, 0.45);
+    box-shadow: 0 18px 30px -18px rgba(111, 159, 178, 0.42);
+    border-color: rgba(111, 159, 178, 0.42);
   }
   100% {
-    box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.6);
-    border-color: rgba(15, 23, 42, 0.32);
+    box-shadow: 0 14px 28px -18px rgba(31, 45, 43, 0.45);
+    border-color: rgba(31, 45, 43, 0.28);
   }
 }
 
@@ -209,8 +270,8 @@ input[type="radio"] {
   display: grid;
   gap: 0.6rem;
   border-radius: 1rem;
-  border: 1px dashed rgba(14, 165, 233, 0.4);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 250, 242, 0.86));
+  border: 1px dashed rgba(95, 143, 162, 0.42);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 249, 0.92));
   padding: 0.9rem 1rem;
   animation: task-pending-breathe 1200ms ease-in-out infinite;
 }
@@ -222,11 +283,11 @@ input[type="radio"] {
   pointer-events: none;
   background: linear-gradient(
     110deg,
-    rgba(14, 165, 233, 0) 0%,
-    rgba(14, 165, 233, 0.12) 45%,
-    rgba(14, 165, 233, 0.24) 50%,
-    rgba(14, 165, 233, 0.12) 55%,
-    rgba(14, 165, 233, 0) 100%
+    rgba(95, 143, 162, 0) 0%,
+    rgba(95, 143, 162, 0.12) 45%,
+    rgba(95, 143, 162, 0.24) 50%,
+    rgba(95, 143, 162, 0.12) 55%,
+    rgba(95, 143, 162, 0) 100%
   );
   transform: translateX(-130%);
   animation: task-pending-sweep 1300ms linear infinite;
@@ -237,7 +298,7 @@ input[type="radio"] {
   z-index: 1;
   height: 0.55rem;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.12);
+  background: rgba(31, 45, 43, 0.12);
 }
 
 .task-pending-line-sm {
@@ -254,13 +315,13 @@ input[type="radio"] {
 
 @keyframes task-regen-glow {
   0% {
-    box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.6);
+    box-shadow: 0 14px 28px -18px rgba(31, 45, 43, 0.45);
   }
   50% {
-    box-shadow: 0 18px 30px -18px rgba(249, 115, 22, 0.45);
+    box-shadow: 0 18px 30px -18px rgba(76, 143, 132, 0.4);
   }
   100% {
-    box-shadow: 0 14px 28px -18px rgba(15, 23, 42, 0.6);
+    box-shadow: 0 14px 28px -18px rgba(31, 45, 43, 0.45);
   }
 }
 
@@ -283,7 +344,7 @@ input[type="radio"] {
 }
 
 .task-regenerating {
-  border-color: rgba(249, 115, 22, 0.45);
+  border-color: rgba(76, 143, 132, 0.45);
   animation: task-regen-glow 1200ms ease-in-out infinite;
 }
 
@@ -294,11 +355,11 @@ input[type="radio"] {
   pointer-events: none;
   background: linear-gradient(
     110deg,
-    rgba(249, 115, 22, 0) 0%,
-    rgba(249, 115, 22, 0.1) 45%,
-    rgba(249, 115, 22, 0.22) 50%,
-    rgba(249, 115, 22, 0.1) 55%,
-    rgba(249, 115, 22, 0) 100%
+    rgba(76, 143, 132, 0) 0%,
+    rgba(76, 143, 132, 0.1) 45%,
+    rgba(76, 143, 132, 0.22) 50%,
+    rgba(76, 143, 132, 0.1) 55%,
+    rgba(76, 143, 132, 0) 100%
   );
   transform: translateX(-130%);
   animation: task-regen-sweep 1200ms linear infinite;
@@ -308,7 +369,7 @@ input[type="radio"] {
   width: 0.7rem;
   height: 0.7rem;
   border-radius: 999px;
-  border: 2px solid rgba(249, 115, 22, 0.2);
-  border-top-color: rgba(249, 115, 22, 0.95);
+  border: 2px solid rgba(76, 143, 132, 0.2);
+  border-top-color: rgba(76, 143, 132, 0.95);
   animation: regen-dot-spin 800ms linear infinite;
 }

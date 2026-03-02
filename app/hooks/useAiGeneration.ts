@@ -17,6 +17,20 @@ type AiTask = {
   milestoneTitle?: string | null;
 };
 
+type AiDebugMeta = {
+  latencyMs?: number;
+  reasoningEffortRequested?: string;
+  reasoningFieldUsed?: string;
+  reasoningTokens?: number;
+  fallback?: boolean;
+  fallbackReason?: string;
+  reasoningAttemptErrors?: Array<{
+    label: string;
+    status: number;
+    errorSnippet: string;
+  }>;
+};
+
 type AiPromptState = {
   mode: "regenerate" | "budgetFull" | "crossReplace";
   pinnedCount: number;
@@ -154,6 +168,7 @@ export default function useAiGeneration(projectId?: string, milestoneId?: string
             milestoneTitle: selectedMilestone ? selectedMilestone.title : undefined,
             milestones: projectMilestones.map((milestone) => ({
               title: milestone.title,
+              description: milestone.description,
               status: milestone.status,
             })),
             constraints: selectedProject.constraints,
@@ -161,7 +176,14 @@ export default function useAiGeneration(projectId?: string, milestoneId?: string
             notes: notes.trim() || undefined,
           }),
         });
-        const data = await response.json();
+        const data = (await response.json()) as {
+          tasks?: AiTask[];
+          scopeWarning?: { filteredCount?: number };
+          meta?: AiDebugMeta;
+        };
+        if (data.meta) {
+          console.debug("[AI debug][tasks]", data.meta);
+        }
         if (!response.ok || !data?.tasks) {
           throw new Error("AI response invalid");
         }
@@ -281,12 +303,12 @@ export default function useAiGeneration(projectId?: string, milestoneId?: string
       const remainingAppend = computeRemainingBudget(budget, totalPlanned, 0);
       const rebalanceCandidates = scopeMilestoneId
         ? planTasks.filter(
-            (task) =>
-              task.source === "ai" &&
-              !task.pinned &&
-              task.status === "todo" &&
-              task.milestoneId !== scopeMilestoneId,
-          )
+          (task) =>
+            task.source === "ai" &&
+            !task.pinned &&
+            task.status === "todo" &&
+            task.milestoneId !== scopeMilestoneId,
+        )
         : [];
       const rebalanceEstimate = rebalanceCandidates.reduce(
         (sum, task) => sum + task.estimateMinutes,
@@ -417,15 +439,25 @@ export default function useAiGeneration(projectId?: string, milestoneId?: string
           constraints: selectedProject.constraints,
         }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as {
+        milestones?: { title: string; description?: string }[];
+        meta?: AiDebugMeta;
+      };
+      if (data.meta) {
+        console.debug("[AI debug][milestones]", data.meta);
+      }
       if (!response.ok || !data?.milestones) {
         throw new Error("AI response invalid");
       }
 
-      const generatedMilestones = data.milestones as { title: string }[];
+      const generatedMilestones = data.milestones as { title: string; description?: string }[];
       generatedMilestones.forEach((milestone) => {
-        state.createMilestone(selectedProject.id, milestone.title);
-        state.addActivity(selectedProject.id, `AI Proposed milestone: ${milestone.title}`);
+        state.createMilestone(
+          selectedProject.id,
+          milestone.title,
+          milestone.description?.trim() || undefined,
+        );
+        state.addActivity(selectedProject.id, `Proposed milestone: ${milestone.title}`);
       });
     } catch (error) {
       console.error("Failed to generate milestones", error);

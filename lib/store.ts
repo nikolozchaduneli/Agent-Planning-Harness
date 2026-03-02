@@ -9,6 +9,7 @@ import type {
   Milestone,
   Activity,
   BrainstormDraft,
+  ThemeScheme,
 } from "./types";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -24,6 +25,7 @@ const defaultState: AppState = {
   ui: {
     selectedDate: todayIso(),
     activeView: "projects",
+    themeScheme: "sage",
     planMilestoneByProject: {},
   },
 };
@@ -33,6 +35,7 @@ type StoreActions = {
   setView: (view: AppView) => void;
   setDate: (date: string) => void;
   setSelectedProject: (projectId?: string) => void;
+  setThemeScheme: (themeScheme: ThemeScheme) => void;
   setPlanMilestoneForProject: (projectId: string, milestoneId: string) => void;
   upsertProject: (project: Project) => void;
   createProject: (data: Omit<Project, "id" | "createdAt" | "updatedAt">) => Project;
@@ -49,9 +52,12 @@ type StoreActions = {
   attachTasksToPlan: (date: string, projectId: string, taskIds: string[]) => void;
   setLastTranscript: (value?: string) => void;
   setLastVoicePrompt: (value?: string) => void;
-  createMilestone: (projectId: string, title: string) => void;
+  createMilestone: (projectId: string, title: string, description?: string) => void;
   updateMilestoneStatus: (id: string, status: "active" | "completed") => void;
-  updateMilestone: (id: string, title: string) => void;
+  updateMilestone: (
+    id: string,
+    data: Partial<Pick<Milestone, "title" | "description">>,
+  ) => void;
   deleteMilestone: (id: string) => void;
   moveMilestone: (id: string, direction: "up" | "down") => void;
   updateProject: (projectId: string, data: Partial<Omit<Project, "id" | "createdAt" | "updatedAt">>) => void;
@@ -71,6 +77,7 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
       ui: {
         ...defaultState.ui,
         ...state.ui,
+        themeScheme: state.ui.themeScheme ?? defaultState.ui.themeScheme,
         planMilestoneByProject: state.ui.planMilestoneByProject ?? {},
       },
     })),
@@ -81,6 +88,8 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
     set((state) => ({
       ui: { ...state.ui, selectedProjectId: projectId },
     })),
+  setThemeScheme: (themeScheme) =>
+    set((state) => ({ ui: { ...state.ui, themeScheme } })),
   setPlanMilestoneForProject: (projectId, milestoneId) =>
     set((state) => {
       const current = state.ui.planMilestoneByProject ?? {};
@@ -265,12 +274,13 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
     set((state) => ({ ui: { ...state.ui, lastTranscript: value } })),
   setLastVoicePrompt: (value) =>
     set((state) => ({ ui: { ...state.ui, lastVoicePrompt: value } })),
-  createMilestone: (projectId, title) =>
+  createMilestone: (projectId, title, description) =>
     set((state) => {
       const milestone: Milestone = {
         id: crypto.randomUUID(),
         projectId,
         title,
+        description: description?.trim() || undefined,
         status: "active",
         createdAt: new Date().toISOString(),
       };
@@ -283,10 +293,18 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
       );
       return { milestones: next };
     }),
-  updateMilestone: (id, title) =>
+  updateMilestone: (id, data) =>
     set((state) => {
       const next = state.milestones.map((m) =>
-        m.id === id ? { ...m, title } : m,
+        m.id === id
+          ? {
+            ...m,
+            ...(typeof data.title === "string" ? { title: data.title } : {}),
+            ...(typeof data.description === "string"
+              ? { description: data.description.trim() || undefined }
+              : {}),
+          }
+          : m,
       );
       return { milestones: next };
     }),

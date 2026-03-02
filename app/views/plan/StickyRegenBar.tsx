@@ -1,4 +1,5 @@
-﻿import type { Milestone } from "@/lib/types";
+import { createPortal } from "react-dom";
+import type { Milestone } from "@/lib/types";
 
 type StickyRegenBarProps = {
   show: boolean;
@@ -17,15 +18,15 @@ export default function StickyRegenBar({
   onGenerate,
   isGenerating,
 }: StickyRegenBarProps) {
-  if (!show) return null;
+  if (!show || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed bottom-4 left-1/2 z-40 w-[min(960px,calc(100vw-2rem))] -translate-x-1/2">
-      <div className="flex h-14 items-center justify-between gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/95 px-4 shadow-[0_-6px_18px_-12px_rgba(15,23,42,0.5)] backdrop-blur">
+  return createPortal(
+    <div className="pointer-events-none fixed bottom-4 left-1/2 z-[70] w-[min(960px,calc(100vw-2rem))] -translate-x-1/2">
+      <div className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/95 px-4 shadow-[0_-6px_18px_-12px_rgba(31,45,43,0.5)] backdrop-blur">
         <div className="flex min-w-0 items-center gap-2">
           <span className="text-[11px] font-semibold text-[var(--muted)]">Milestone</span>
           <select
-            className="min-w-[160px] max-w-[260px] truncate rounded-full border border-transparent bg-[var(--panel)] px-3 py-2 text-xs shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="min-w-[160px] max-w-[260px] truncate rounded-full border border-transparent bg-[var(--panel)] px-3 py-2 text-xs shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             value={selectedMilestoneId}
             onChange={(e) => setSelectedMilestoneId(e.target.value)}
           >
@@ -60,6 +61,7 @@ export default function StickyRegenBar({
           {isGenerating ? "Generating..." : "Generate tasks"}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

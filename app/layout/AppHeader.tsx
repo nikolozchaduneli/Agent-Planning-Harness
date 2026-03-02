@@ -7,11 +7,11 @@ import useVoiceRecording from "@/app/hooks/useVoiceRecording";
 
 const styles = {
   header:
-    "sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] bg-[#f8fafc]/90 px-3 py-3 backdrop-blur-md sm:gap-4 sm:py-4 sm:pl-8 sm:pr-3",
+    "sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--paper)]/90 px-3 py-3 backdrop-blur-md sm:gap-4 sm:py-4 sm:pl-8 sm:pr-3",
   navButton:
-    "shrink-0 snap-start rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 sm:px-5 sm:py-2 sm:text-xs sm:tracking-[0.2em]",
+    "shrink-0 snap-start rounded-full px-3 py-1.5 text-[11px] font-medium tracking-wide transition-all hover:-translate-y-0.5 sm:px-5 sm:py-2 sm:text-xs",
   dateInput:
-    "rounded-xl border border-transparent bg-[var(--panel)] px-3 py-2 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
+    "rounded-full border border-[var(--border-medium)] bg-[var(--panel)] px-4 py-2 text-sm text-[var(--ink)] focus:outline-none hover:bg-white transition-colors",
 };
 
 type AppHeaderProps = {
@@ -272,30 +272,30 @@ export default function AppHeader({
   return (
     <header ref={headerRef} className={styles.header}>
       {isFirstRun ? (
-        <div className="text-xs font-bold uppercase tracking-[0.4em] text-[var(--muted)]">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
           Welcome to Task Centric Planner
         </div>
       ) : (
-        <div ref={navGroupRef} className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <nav className="no-scrollbar flex min-w-0 max-w-[58vw] snap-x snap-mandatory gap-1 overflow-x-auto pr-1 sm:max-w-none sm:gap-2 sm:overflow-visible sm:pr-0">
+        <div ref={navGroupRef} className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <nav className="no-scrollbar flex min-w-0 max-w-[58vw] snap-x snap-mandatory gap-2 overflow-x-auto pr-1 sm:max-w-none sm:gap-3 sm:overflow-visible sm:pr-0">
             {views.map((view) => (
               <button
                 key={view}
                 onClick={() => setView(view)}
                 className={`${styles.navButton} ${ui.activeView === view
-                    ? "bg-[var(--accent)] text-white shadow shadow-[var(--accent)]/30"
-                    : "bg-transparent text-[var(--muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+                  ? "bg-[var(--ink)] text-white shadow-sm"
+                  : "bg-transparent text-[var(--muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
                   }`}
               >
                 {view === "brainstorm" ? (
                   <>
-                    <span className="sm:hidden">board</span>
-                    <span className="hidden sm:inline">drawing board</span>
+                    <span className="sm:hidden">Board</span>
+                    <span className="hidden sm:inline">Drawing Board</span>
                   </>
                 ) : view === "projects" ? (
-                  ui.selectedProjectId ? "settings" : "new project"
+                  ui.selectedProjectId ? "Settings" : "New Project"
                 ) : (
-                  view
+                  view.charAt(0).toUpperCase() + view.slice(1)
                 )}
               </button>
             ))}
@@ -303,7 +303,7 @@ export default function AppHeader({
         </div>
       )}
 
-      <div ref={controlsGroupRef} className="ml-auto flex items-center gap-3 sm:gap-4">
+      <div ref={controlsGroupRef} className="ml-auto flex items-center gap-4 sm:gap-6">
         {!isFirstRun && (
           <div className="flex items-center gap-2">
             <label className="hidden text-xs font-medium text-[var(--muted)] sm:block">
@@ -325,9 +325,8 @@ export default function AppHeader({
                 onClick={handleVoiceCapture}
                 aria-label={recordButtonLabel}
                 title={recordButtonLabel}
-                className={`relative flex h-9 items-center justify-center rounded-full border text-xs font-bold shadow-sm transition hover:-translate-y-0.5 ${
-                  showRecordText ? "gap-2 px-4" : "w-9"
-                } ${activeRecordingField === "global"
+                className={`relative flex h-9 items-center justify-center rounded-full border text-xs font-bold shadow-sm transition hover:-translate-y-0.5 ${showRecordText ? "gap-2 px-4" : "w-9"
+                  } ${activeRecordingField === "global"
                     ? "animate-pulse border-red-500 bg-red-50 text-red-600"
                     : "border-[var(--border-medium)] bg-white text-[var(--ink)]"
                   }`}
@@ -394,29 +393,28 @@ export default function AppHeader({
           !selectedProject &&
           !activitySidebarOpen &&
           !sidebarTransitioning && (
-          <button
-            onClick={onToggleActivity}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
-            title="Show activity"
-            aria-label="Show activity"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+            <button
+              onClick={onToggleActivity}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-medium)] bg-white p-0 text-[var(--ink)] shadow-sm transition hover:-translate-y-0.5"
+              title="Show activity"
+              aria-label="Show activity"
             >
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
-        )}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+          )}
       </div>
     </header>
   );
 }
-

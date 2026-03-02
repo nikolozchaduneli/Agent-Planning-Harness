@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useAppStore } from "@/lib/store";
 import { useShallow } from "zustand/react/shallow";
@@ -39,7 +39,7 @@ export default function BrainstormView() {
 
   return (
     <section className="grid h-full min-h-0 gap-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 lg:gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="flex min-h-0 flex-col rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)] backdrop-blur-md overflow-hidden">
+      <div className="flex min-h-0 flex-col rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(31,45,43,0.4)] backdrop-blur-md overflow-hidden">
         <div className="no-scrollbar flex min-h-0 flex-1 overflow-y-auto pr-2 scroll-smooth">
           <div
             className={`flex min-h-full w-full flex-col gap-4 ${
@@ -83,7 +83,7 @@ export default function BrainstormView() {
                 className={`max-w-[85%] rounded-[24px] p-5 text-[15px] leading-relaxed shadow-sm transition-all ${
                   msg.role === "user"
                     ? "self-end bg-[var(--accent)] text-white"
-                    : "self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--ink)]"
+                    : "self-start bg-white border border-[rgba(31,45,43,0.06)] text-[var(--ink)]"
                 }`}
               >
                 {msg.content}
@@ -91,7 +91,7 @@ export default function BrainstormView() {
             ))}
 
             {isBrainstorming && (
-              <div className="self-start bg-white border border-[rgba(15,23,42,0.06)] text-[var(--muted)] rounded-[24px] p-5 text-sm animate-pulse flex items-center gap-3">
+              <div className="self-start bg-white border border-[rgba(31,45,43,0.06)] text-[var(--muted)] rounded-[24px] p-5 text-sm animate-pulse flex items-center gap-3">
                 <div className="flex gap-1">
                   <div
                     className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] animate-bounce"
@@ -154,7 +154,7 @@ export default function BrainstormView() {
               value={brainstormInput}
               onChange={(e) => setBrainstormInput(e.target.value)}
               placeholder="Pitch the project you want to build..."
-              className="w-full rounded-2xl border-transparent bg-[var(--panel)] pl-5 pr-12 py-4 shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-all group-hover:shadow-[0_0_0_1px_rgba(15,23,42,0.2)]"
+              className="w-full rounded-2xl border-transparent bg-[var(--panel)] pl-5 pr-12 py-4 shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-all group-hover:shadow-[0_0_0_1px_rgba(31,45,43,0.2)]"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <DictationMic
@@ -188,7 +188,7 @@ export default function BrainstormView() {
       </div>
 
       <div className="no-scrollbar flex min-h-0 flex-col gap-6 overflow-y-auto pr-2 lg:pr-6">
-        <div className="flex min-h-0 flex-1 flex-col rounded-[32px] bg-white/40 border border-white/60 p-6 backdrop-blur-md shadow-[0_10px_30px_-15px_rgba(15,23,42,0.1)]">
+        <div className="flex min-h-0 flex-1 flex-col rounded-[32px] bg-white/40 border border-white/60 p-6 backdrop-blur-md shadow-[0_10px_30px_-15px_rgba(31,45,43,0.1)]">
           <h3 className="text-xs font-bold uppercase tracking-[0.3em] text-[var(--muted)] mb-6">
             Live Canvas
           </h3>
@@ -241,7 +241,7 @@ export default function BrainstormView() {
                     {activeDraft.constraints.map((constraint, i) => (
                       <span
                         key={`${constraint}-${i}`}
-                        className="text-[10px] font-medium bg-slate-100 text-slate-500 py-1 px-2.5 rounded-full border border-slate-200"
+                        className="rounded-full border border-[var(--border-medium)] bg-[var(--panel)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)]"
                       >
                         {constraint}
                       </span>
@@ -256,7 +256,7 @@ export default function BrainstormView() {
                 className={`mt-6 w-full rounded-2xl py-4 text-xs font-bold uppercase tracking-[0.3em] shadow-xl transition-all group flex items-center justify-center gap-3 ${
                   activeDraft.isReady
                     ? "bg-[var(--ink)] text-white hover:scale-[1.02] active:scale-[0.98]"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-[var(--panel)] text-[var(--muted)]/70 cursor-not-allowed"
                 }`}
               >
                 {activeDraft.isReady ? "Initialize Project" : "Awaiting Readiness..."}

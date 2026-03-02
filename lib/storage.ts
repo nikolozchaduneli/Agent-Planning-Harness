@@ -6,6 +6,7 @@ const DB_VERSION = 1;
 const STORE_NAME = "app_state";
 const STATE_KEY = "root";
 const LS_KEY = "task-organizer.state.v1";
+const THEME_SCHEMES = new Set(["sage", "mist", "dawn"]);
 
 const getDb = async () =>
   openDB(DB_NAME, DB_VERSION, {
@@ -25,7 +26,17 @@ const normalizeState = (state: AppState): AppState => {
     }
     return plan;
   });
-  return { ...state, dailyPlans: migratedPlans };
+  const nextThemeScheme = THEME_SCHEMES.has(state.ui.themeScheme)
+    ? state.ui.themeScheme
+    : "sage";
+  return {
+    ...state,
+    dailyPlans: migratedPlans,
+    ui: {
+      ...state.ui,
+      themeScheme: nextThemeScheme,
+    },
+  };
 };
 
 export const loadState = async (): Promise<AppState | null> => {

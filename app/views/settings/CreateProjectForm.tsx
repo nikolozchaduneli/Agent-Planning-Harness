@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useAppStore } from "@/lib/store";
@@ -42,7 +42,7 @@ export default function CreateProjectForm() {
   };
 
   return (
-    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)]">
+    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(31,45,43,0.4)]">
       <h2 className="text-2xl">Create a project</h2>
       <p className="text-sm text-[var(--muted)]">
         Anchor your day around one project. The plan follows the project.
@@ -52,7 +52,7 @@ export default function CreateProjectForm() {
         <div
           className={`rounded-2xl border p-4 shadow-sm transition ${
             projectCreationPath === "manual"
-              ? "border-[var(--accent)] bg-[rgba(249,115,22,0.08)]"
+              ? "border-[var(--accent)] bg-[rgba(76,143,132,0.12)]"
               : "border-[var(--border-medium)] bg-white"
           }`}
         >
@@ -76,7 +76,7 @@ export default function CreateProjectForm() {
         <div
           className={`rounded-2xl border p-4 shadow-sm transition ${
             projectCreationPath === "ai"
-              ? "border-[var(--accent)] bg-[rgba(249,115,22,0.08)]"
+              ? "border-[var(--accent)] bg-[rgba(76,143,132,0.12)]"
               : "border-[var(--border-medium)] bg-white"
           }`}
         >

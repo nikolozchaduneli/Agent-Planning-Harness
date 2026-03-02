@@ -1,6 +1,6 @@
 # Navigation
 
-Last updated: 2026-02-25
+Last updated: 2026-03-01
 Use this as a fast map to where behavior actually lives.
 
 ## Entry points
@@ -23,7 +23,7 @@ Use this as a fast map to where behavior actually lives.
 - `app/views/plan/index.tsx`: plan orchestration (budget, milestone scope, notes, tasks, generation).
 - `app/views/FocusView.tsx`: single-task execution view.
 - `app/views/HistoryView.tsx`: completion stats + recent history.
-- `app/views/settings/index.tsx`: project editing + milestone editing + existing project picker.
+- `app/views/settings/index.tsx`: project editing + milestone title/description editing + milestone regeneration + existing project picker.
 - `app/views/settings/CreateProjectForm.tsx`: manual/AI-assisted creation entry.
 
 ## Plan view landmarks (`app/views/plan/index.tsx`)
@@ -37,7 +37,7 @@ Use this as a fast map to where behavior actually lives.
 
 ## Shared components
 - `app/components/TaskCard.tsx`: plan/focus task controls (status, estimate, pin, focus, delete, inline edits).
-- `app/components/MilestoneListEditable.tsx`: milestone rename/reorder/delete UI in Settings.
+- `app/components/MilestoneListEditable.tsx`: milestone title/description edit + reorder/delete UI in Settings.
 - `app/components/DictationMic.tsx`: mic button reused across forms.
 
 ## Hooks (behavior orchestration)
@@ -57,6 +57,7 @@ Use this as a fast map to where behavior actually lives.
 ## Cross-component event bridge
 - `open-left-sidebar`: Plan title link -> `AppShell` opens left sidebar.
 - `planning-milestone-select` / `planning-milestone-change`: sidebar milestone clicks <-> plan milestone selection sync.
+- `open-settings-milestones`: sidebar Milestones section title click -> Settings milestones section scroll + inline edit focus (when a milestone id is provided).
 - `global-transcript` / `apply-plan-notes`: header voice capture -> Plan notes insertion.
 
 ## Prompt assets

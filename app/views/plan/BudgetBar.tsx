@@ -1,4 +1,4 @@
-﻿import { formatMinutes } from "@/lib/constants";
+import { formatMinutes } from "@/lib/constants";
 import { blockNonNumericKey, blockNonNumericPaste } from "@/lib/forms";
 
 type BudgetBarProps = {
@@ -17,10 +17,6 @@ type BudgetBarProps = {
   onClearOverride: () => void;
 };
 
-const styles = {
-  wrapper: "rounded-2xl bg-[var(--panel)] px-4 py-2 text-sm",
-};
-
 export default function BudgetBar({
   totalPlanned,
   budget,
@@ -37,59 +33,61 @@ export default function BudgetBar({
   onClearOverride,
 }: BudgetBarProps) {
   return (
-    <div className={styles.wrapper}>
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="flex items-center gap-2">
-            Planned:{" "}
-            <span
-              className={`inline-block font-semibold tabular-nums transition-all duration-200 ${
-                plannedTick
-                  ? "text-[var(--accent)] -translate-y-0.5"
-                  : isOverBudget
-                    ? "text-red-600"
-                    : "text-[var(--ink)]"
+    <div className="flex w-full min-w-0 flex-col gap-1.5">
+      {/* Compact time display */}
+      <div className="flex items-center gap-2">
+        <span className="flex items-baseline gap-1 text-sm tabular-nums">
+          <span
+            className={`font-semibold transition-all duration-200 ${plannedTick
+                ? "text-[var(--accent)] -translate-y-0.5"
+                : isOverBudget
+                  ? "text-[var(--warning)]"
+                  : "text-[var(--ink)]"
               }`}
-            >
-              {formatMinutes(totalPlanned)}
-            </span>
+          >
+            {formatMinutes(totalPlanned)}
           </span>
-          <span className="text-[var(--muted)]">|</span>
-          <span>
-            Budget:{" "}
-            <span className={isOverBudget ? "text-red-600" : "font-semibold"}>
-              {formatMinutes(budget || 0)}
-            </span>{" "}
-            <span className="text-xs text-[var(--muted)]">
-              ({hasBudgetOverride ? "override" : "default"})
-            </span>
+          <span className="text-[var(--muted)] font-normal">/</span>
+          <span className={`font-medium ${isOverBudget ? "text-[var(--warning)]" : "text-[var(--muted)]"}`}>
+            {formatMinutes(budget || 0)}
           </span>
-          {!showBudgetOverride && (
-            <button
-              type="button"
-              onClick={() => setShowBudgetOverride(true)}
-              className="text-xs font-semibold text-[var(--accent)] transition hover:opacity-80"
-            >
-              Adjust today&apos;s time
-            </button>
-          )}
-        </div>
-        <div className="h-2 w-full rounded-full bg-white/80 shadow-inner">
-          {budgetPercent > 0 && (
-            <div
-              className={`h-2 rounded-full origin-left transition-all duration-200 ${
-                isOverBudget ? "bg-red-500" : "bg-[var(--accent)]"
-              } ${budgetPulse ? "scale-[1.02] shadow-sm ring-2 ring-[var(--accent)]/30" : "scale-100"}`}
-              style={{ width: `${budgetPercent}%` }}
-            />
-          )}
-        </div>
+        </span>
+        {/* Clock icon to toggle time override */}
+        <button
+          type="button"
+          onClick={() => setShowBudgetOverride(!showBudgetOverride)}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+          title="Adjust today's time"
+          aria-label="Adjust today's time"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </button>
       </div>
+
+      {/* Thin progress bar */}
+      <div className="h-1.5 w-full rounded-full bg-[rgba(31,45,43,0.08)]">
+        {budgetPercent > 0 && (
+          <div
+            className={`h-1.5 rounded-full origin-left transition-all duration-300 ease-out ${isOverBudget ? "bg-[var(--warning)]" : "bg-[var(--accent)]"
+              } ${budgetPulse ? "scale-x-[1.02] ring-1 ring-[var(--accent)]/20" : ""}`}
+            style={{ width: `${Math.min(budgetPercent, 100)}%` }}
+          />
+        )}
+      </div>
+
+      {/* Over-budget hint */}
+      {isOverBudget && budget > 0 && (
+        <p className="text-[11px] text-[var(--warning)]/90">
+          {formatMinutes(totalPlanned - budget)} over — remove a task or adjust
+        </p>
+      )}
+
+      {/* Override input (hidden by default) */}
       {showBudgetOverride && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-medium text-[var(--muted)]">
-            Time for today
-          </span>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             type="number"
             min={30}
@@ -103,9 +101,9 @@ export default function BudgetBar({
             onKeyDown={blockNonNumericKey}
             onPaste={blockNonNumericPaste}
             onChange={(event) => setBudgetOverrideDraft(event.target.value)}
-            className="w-28 rounded-xl border border-[var(--border-medium)] bg-white px-3 py-1.5 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.12)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="w-24 rounded-lg border border-[var(--border-medium)] bg-[var(--panel)] px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
           />
-          <span className="text-xs uppercase tracking-[0.1em] text-[var(--muted)]">minutes</span>
+          <span className="text-[10px] text-[var(--muted)]">min</span>
           <button
             type="button"
             onClick={() => {
@@ -131,18 +129,12 @@ export default function BudgetBar({
                 onClearOverride();
                 setShowBudgetOverride(false);
               }}
-              className="text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
+              className="text-xs text-[var(--muted)] transition hover:text-[var(--ink)]"
             >
               Reset
             </button>
           )}
         </div>
-      )}
-      {isOverBudget && budget > 0 && (
-        <p className="mt-1 text-xs text-red-500">
-          Over budget by {formatMinutes(totalPlanned - budget)} - remove a task or adjust
-          estimates.
-        </p>
       )}
     </div>
   );

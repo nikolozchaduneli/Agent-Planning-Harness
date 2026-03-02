@@ -1,4 +1,4 @@
-﻿import DictationMic from "@/app/components/DictationMic";
+import DictationMic from "@/app/components/DictationMic";
 import useVoiceRecording from "@/app/hooks/useVoiceRecording";
 import { blockNonNumericKey, blockNonNumericPaste } from "@/lib/forms";
 
@@ -22,14 +22,20 @@ export default function ManualTaskForm({
   const { startRecording, stopRecording, activeRecordingField } = useVoiceRecording();
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4">
+    <form
+      className="grid gap-3 rounded-2xl border border-[var(--border-medium)] bg-white/90 p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onAdd();
+      }}
+    >
       <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
         <div className="relative flex w-full min-w-0 flex-1 items-center">
           <input
             value={manualTitle}
             onChange={(event) => setManualTitle(event.target.value)}
             placeholder="Add a manual task"
-            className="h-10 w-full rounded-xl border border-transparent bg-[var(--panel)] px-3 pr-10 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="h-10 w-full rounded-xl border border-transparent bg-[var(--panel)] px-3 pr-10 text-sm shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
           />
           <div className="absolute right-1">
             <DictationMic
@@ -70,14 +76,14 @@ export default function ManualTaskForm({
               onChange={(event) =>
                 setManualEstimate(event.target.value === "" ? 0 : Number(event.target.value))
               }
-              className="h-10 w-24 rounded-xl border border-[var(--border-medium)] bg-white/90 px-3 text-sm shadow-[0_0_0_1px_rgba(15,23,42,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="h-10 w-24 rounded-xl border border-[var(--border-medium)] bg-white/90 px-3 text-sm shadow-[0_0_0_1px_rgba(31,45,43,0.1)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             />
             <span className="text-[11px] font-medium text-[var(--muted)]">min</span>
           </div>
         </div>
         <div className="flex w-full justify-start md:w-auto md:justify-self-end">
           <button
-            onClick={onAdd}
+            type="submit"
             className="h-10 rounded-full border border-[var(--border-medium)] bg-white px-5 text-xs font-semibold text-[var(--ink)] shadow transition hover:-translate-y-0.5"
           >
             Add
@@ -90,6 +96,6 @@ export default function ManualTaskForm({
           {selectedMilestoneTitle || "Whole Project"}
         </span>
       </p>
-    </div>
+    </form>
   );
 }

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -32,7 +32,7 @@ export default function HistoryView() {
   );
 
   return (
-    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.4)]">
+    <section className="grid gap-6 rounded-[28px] bg-white/80 p-6 shadow-[0_20px_40px_-30px_rgba(31,45,43,0.4)]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl">History & analytics</h2>
@@ -70,7 +70,7 @@ export default function HistoryView() {
         const daysWithData = projectHistory.filter((entry) => entry.total > 0);
         if (daysWithData.length === 0) {
           return (
-            <div className="rounded-[24px] border border-dashed border-[rgba(15,23,42,0.2)] p-6 text-center text-sm text-[var(--muted)]">
+            <div className="rounded-[24px] border border-dashed border-[rgba(31,45,43,0.2)] p-6 text-center text-sm text-[var(--muted)]">
               No history yet — complete your first task to start tracking.
             </div>
           );
