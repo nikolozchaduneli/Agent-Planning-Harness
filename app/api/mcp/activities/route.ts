@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readServerState, writeServerState } from "@/lib/server-store";
+import { readServerState, writeServerState, markAgentDirty } from "@/lib/server-store";
 import type { Activity } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -25,5 +25,6 @@ export async function POST(req: NextRequest) {
 
   state.activities.unshift(activity);
   await writeServerState(state);
+  await markAgentDirty();
   return NextResponse.json(activity, { status: 201 });
 }

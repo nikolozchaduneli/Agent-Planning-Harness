@@ -134,7 +134,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "create_task",
       description:
-        "Create a new task in a project. Use this to add work items that don't exist in the current plan.",
+        "Create a new task in a project. The task is automatically added to today's daily plan. Use this to add work items that don't exist yet.",
       inputSchema: {
         type: "object",
         properties: {

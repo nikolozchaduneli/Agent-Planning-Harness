@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readServerState, writeServerState } from "@/lib/server-store";
+import { readServerState, writeServerState, markAgentDirty } from "@/lib/server-store";
 import type { TaskStatus } from "@/lib/types";
 
 export async function PATCH(
@@ -23,10 +23,12 @@ export async function PATCH(
   }
 
   const task = state.tasks[taskIndex];
+  const now = new Date().toISOString();
   const updatedTask = {
     ...task,
     status,
-    completedAt: status === "done" ? new Date().toISOString() : undefined,
+    updatedAt: now,
+    completedAt: status === "done" ? now : undefined,
   };
 
   state.tasks[taskIndex] = updatedTask;
@@ -45,5 +47,6 @@ export async function PATCH(
   });
 
   await writeServerState(state);
+  await markAgentDirty();
   return NextResponse.json(updatedTask);
 }

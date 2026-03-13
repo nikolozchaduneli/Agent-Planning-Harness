@@ -24,6 +24,7 @@ export type Task = {
   estimateMinutes: number;
   status: TaskStatus;
   createdAt: string;
+  updatedAt?: string;
   completedAt?: string;
   source: TaskSource;
   aiBatchId?: string;

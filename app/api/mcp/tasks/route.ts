@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readServerState, writeServerState } from "@/lib/server-store";
-import type { Task } from "@/lib/types";
+import { readServerState, writeServerState, markAgentDirty } from "@/lib/server-store";
+import type { DailyPlan, Task } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   const state = await readServerState();
@@ -41,16 +41,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  const now = new Date().toISOString();
   const task: Task = {
     id: crypto.randomUUID(),
     projectId,
     milestoneId: milestoneId ?? undefined,
     title,
     description: description ?? undefined,
-    estimateMinutes: estimateMinutes ?? 30,
+    estimateMinutes: Number(estimateMinutes ?? 30),
     status: "todo",
     source: "manual",
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
 
   state.tasks.push(task);
@@ -61,6 +63,25 @@ export async function POST(req: NextRequest) {
     timestamp: new Date().toISOString(),
   });
 
+  // Add task to today's daily plan, creating the plan if it doesn't exist yet.
+  const today = new Date().toISOString().slice(0, 10);
+  const plan = state.dailyPlans.find(
+    (p) => p.projectId === projectId && p.date === today
+  );
+  if (plan) {
+    plan.taskIds.push(task.id);
+  } else {
+    const newPlan: DailyPlan = {
+      id: crypto.randomUUID(),
+      projectId,
+      date: today,
+      taskIds: [task.id],
+      createdAt: new Date().toISOString(),
+    };
+    state.dailyPlans.push(newPlan);
+  }
+
   await writeServerState(state);
+  await markAgentDirty();
   return NextResponse.json(task, { status: 201 });
 }

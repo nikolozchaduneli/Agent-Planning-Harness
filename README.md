@@ -8,13 +8,14 @@ This project is building that layer.
 
 ## The vision
 
-**Phase 1 (now):** A local-first planner that forces single-project focus. One project, one day, one plan. AI helps you brainstorm scope, propose milestones, generate tasks, and produce execution prompts — but never takes the wheel. You stay in control of what matters today.
+**Phase 1 (done):** A local-first planner that forces single-project focus. One project, one day, one plan. AI helps you brainstorm scope, propose milestones, generate tasks, and produce execution prompts — but never takes the wheel. You stay in control of what matters today.
 
-**Phase 2 (next):** An MCP server that exposes this planner as structured external memory for LLM agents. Any agent — coding, research, creative — can read the plan, pick up tasks, report progress, and request new work. The planner becomes the harness: **ideation → structurization → tracking**, fully autonomous.
+**Phase 2 (done):** An MCP server that exposes this planner as structured external memory for LLM agents. Any agent — coding, research, creative — can read the plan, pick up tasks, report progress, and request new work. The planner becomes the harness: **ideation → structurization → tracking**, fully autonomous.
 
 - **Daily plan as first-class primitive** — agents call one tool and know exactly what's in scope for today.
 - **Self-directed task loop** — agents find work, claim it (`pick_task`), execute, and complete in a repeatable cycle. No human dispatch needed.
-- **Activity feed as communication channel** — agent notes appear in the browser UI. No external notification system required.
+- **Activity feed as communication channel** — agent notes appear in the browser UI in real time. No external notification system required.
+- **Real-time sync** — agent changes propagate to the browser within ~1 second via SSE, no reload required. A dirty-flag mechanism prevents feedback loops between browser and agent writes.
 
 The end state is a system where you sketch a project idea over coffee, the planner breaks it into milestones and tasks, and agents execute against it — with you reviewing progress, not managing process.
 
@@ -41,6 +42,21 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## MCP server (agent integration)
+
+The MCP server lets any MCP-compatible agent (Claude Code, custom agents) interact with your planner directly.
+
+```bash
+npm run mcp:install   # install mcp-server deps (first time)
+npm run mcp:build     # compile TypeScript
+```
+
+`.mcp.json` is already configured — Claude Code picks it up automatically when the app is running on port 3000.
+
+**Available tools (9):** `list_projects`, `list_milestones`, `get_today_plan`, `list_tasks`, `pick_task`, `complete_task`, `update_task_status`, `create_task`, `log_progress`
+
+See [`mcp-server/README.md`](mcp-server/README.md) for the full protocol and agent workflow.
 
 ## AI features (optional)
 
@@ -75,7 +91,7 @@ AZURE_VOICE_API_VERSION=2025-03-01-preview
 app/
   api/ai/          # AI routes (tasks, milestones, brainstorm, focus prompts)
   api/voice/       # Voice transcription proxy
-  api/mcp/         # MCP REST API (sync, projects, tasks, milestones, plans, activities)
+  api/mcp/         # MCP REST API (sync, projects, tasks, milestones, plans, activities, stream)
   views/           # User-facing screens (Plan, Focus, History, Settings, Brainstorm)
   components/      # Shared components (TaskCard, DictationMic, etc.)
   hooks/           # Client orchestration (AI generation, voice, drafts)
@@ -85,8 +101,9 @@ lib/
   selectors.ts     # Derived state reads
   types.ts         # Domain types
   storage.ts       # Persistence layer
-  server-store.ts  # Server-side file store (data/planner-state.json)
-mcp-server/        # MCP server — exposes planner to AI agents via stdio
+  server-store.ts  # Server-side file store (data/planner-state.json) + dirty flag helpers
+mcp-server/        # Standalone stdio MCP server — exposes planner to AI agents
+data/              # Runtime state (planner-state.json) — gitignored
 ```
 
 ## License

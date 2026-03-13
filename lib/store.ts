@@ -144,8 +144,9 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
         if (task.id !== taskId) {
           return task;
         }
-        const completedAt = status === "done" ? new Date().toISOString() : undefined;
-        return { ...task, status, completedAt };
+        const now = new Date().toISOString();
+        const completedAt = status === "done" ? now : undefined;
+        return { ...task, status, completedAt, updatedAt: now };
       });
       const task = tasks.find((item) => item.id === taskId);
       const date = state.ui.selectedDate;
@@ -179,19 +180,19 @@ export const useAppStore = create<AppState & StoreActions>((set, get) => ({
   updateTaskEstimate: (taskId, estimateMinutes) =>
     set((state) => ({
       tasks: state.tasks.map((task) =>
-        task.id === taskId ? { ...task, estimateMinutes } : task,
+        task.id === taskId ? { ...task, estimateMinutes, updatedAt: new Date().toISOString() } : task,
       ),
     })),
   updateTaskDetails: (taskId, data) =>
     set((state) => ({
       tasks: state.tasks.map((task) =>
-        task.id === taskId ? { ...task, ...data } : task,
+        task.id === taskId ? { ...task, ...data, updatedAt: new Date().toISOString() } : task,
       ),
     })),
   toggleTaskPinned: (taskId) =>
     set((state) => ({
       tasks: state.tasks.map((task) =>
-        task.id === taskId ? { ...task, pinned: !task.pinned } : task,
+        task.id === taskId ? { ...task, pinned: !task.pinned, updatedAt: new Date().toISOString() } : task,
       ),
     })),
   removeTasks: (taskIds) =>
