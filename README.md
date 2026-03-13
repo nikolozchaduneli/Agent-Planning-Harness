@@ -1,19 +1,25 @@
 # Task Centric Planner
 
-A local-first daily planner built around one core idea: **focus on one project per day**.
+**Project management for the age of LLM agents.**
 
-Instead of juggling five things at once, you pick a single project, set a time budget, and plan tasks scoped to milestones. AI can suggest milestones and tasks for you, but the app works fully offline without it.
+We outsourced a chunk of our cognition to LLMs — especially the organizational part. The irony is that the tools meant to help us think have made it harder to start, easier to scatter, and trivial to drown in half-finished plans. Azure DevOps, Jira, Linear — they were built for teams of humans coordinating with humans. None of them were designed for a world where an autonomous agent needs a structured plan, external memory, and a progress tracker to do real work.
 
-## Why
+This project is building that layer.
 
-Most planners let you scatter tasks across dozens of projects. This one forces focus: one project, one day, one plan. You brainstorm a project, break it into milestones, generate or hand-write tasks, then execute them one at a time in Focus view.
+## The vision
 
-## How it works
+**Phase 1 (now):** A local-first planner that forces single-project focus. One project, one day, one plan. AI helps you brainstorm scope, propose milestones, generate tasks, and produce execution prompts — but never takes the wheel. You stay in control of what matters today.
 
-1. **Brainstorm** - Pitch a project idea to the AI Drawing Board. It helps you shape the scope, milestones, and constraints before you commit.
-2. **Plan** - Pick a milestone, set a time budget, and generate or manually add tasks for today. Pin the ones you like, regenerate the rest.
-3. **Focus** - Lock onto one task. Generate a structured AI prompt you can paste into any assistant to get implementation help.
-4. **History** - Track what you completed and when. See progress over time per project.
+**Phase 2 (next):** An MCP server that exposes this planner as structured external memory for LLM agents. Any agent — coding, research, creative — can read the plan, pick up tasks, report progress, and request new work. The planner becomes the harness: **ideation → structurization → tracking**, fully autonomous.
+
+The end state is a system where you sketch a project idea over coffee, the planner breaks it into milestones and tasks, and agents execute against it — with you reviewing progress, not managing process.
+
+## How it works today
+
+1. **Brainstorm** — Pitch a project idea to the AI Drawing Board. It shapes scope, milestones, and constraints before you commit.
+2. **Plan** — Pick a milestone, set a time budget, generate or hand-write tasks. Pin what you like, regenerate the rest.
+3. **Focus** — Lock onto one task. Generate a structured prompt you can paste into any AI assistant for implementation help.
+4. **History** — Track completions over time per project.
 
 Everything is stored in your browser (IndexedDB). No account, no server, no data leaves your machine unless you opt into AI features.
 
@@ -78,4 +84,4 @@ lib/
 
 ## License
 
-MIT
+Apache-2.0
