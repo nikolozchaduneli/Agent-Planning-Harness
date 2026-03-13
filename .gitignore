@@ -37,8 +37,11 @@ yarn-error.log*
 # vercel
 .vercel
 
-#codex 
+#codex
 .codex
+
+# mcp pointer state
+.mcp-pointer/
 
 #tmp files
 *.tmp

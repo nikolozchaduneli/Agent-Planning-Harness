@@ -3,7 +3,7 @@
 )
 
 if (-not $StatePath -or $StatePath.Trim().Length -eq 0) {
-  $StatePath = "C:\\Users\\User\\Desktop\\Task Organizer\\.mcp-pointer\\shared-state.json"
+  $StatePath = (Join-Path $PSScriptRoot "..\.mcp-pointer\shared-state.json")
 }
 
 if (!(Test-Path $StatePath)) {
