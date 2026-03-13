@@ -23,11 +23,11 @@ The end state is a system where you sketch a project idea over coffee, the plann
 
 Everything is stored in your browser (IndexedDB). No account, no server, no data leaves your machine unless you opt into AI features.
 
-## Screenshots
+## Feature demos
 
-| Onboarding | Drawing Board | Plan |
+| Drawing Board | Plan | Focus |
 |---|---|---|
-| ![Onboarding](docs/ui/ui-01-onboarding.png) | ![Drawing Board](docs/ui/ui-11-drawing-board-suggestions.png) | ![Plan](docs/ui/ui-06-manual-task-added.png) |
+| ![Drawing Board](docs/ui/gif-01-drawing-board.gif) | ![Plan](docs/ui/gif-02-plan-tasks.gif) | ![Focus](docs/ui/gif-03-focus-prompt.gif) |
 
 ## Run locally
 

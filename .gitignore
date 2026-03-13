@@ -46,6 +46,9 @@ yarn-error.log*
 #tmp files
 *.tmp
 
+# personal launch notes
+docs/LAUNCH-CHECKLIST.md
+
 # transient UI test artifacts
 output/playwright/
 

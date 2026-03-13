@@ -62,9 +62,6 @@ export default function CreateProjectForm() {
           <p className="mt-2 text-sm text-[var(--ink)]">
             Fill out the project details yourself and start planning right away.
           </p>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--border-medium)] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            Fast start
-          </div>
           <button
             type="button"
             onClick={() => setProjectCreationPath("manual")}

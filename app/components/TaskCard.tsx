@@ -335,12 +335,15 @@ export default function TaskCard({
         )
       }
 
-      {/* === FOCUS MODE (unchanged) === */}
-      {
-        mode === "focus" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className={`${tw.ghostBtn} text-sm`}>Estimate: {task.estimateMinutes}m</span>
-            <span className={`${tw.ghostBtn} text-sm`}>Status: {task.status}</span>
+      {/* === FOCUS MODE === */}
+      {mode === "focus" && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-[var(--border-subtle)] pt-3">
+          <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+            <span>{formatEstimate(task.estimateMinutes)}</span>
+            <span aria-hidden="true">·</span>
+            <span className="capitalize">{task.status}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onStatusChange(task.id, "doing")}
               className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold tracking-wide text-white shadow transition hover:-translate-y-0.5"
@@ -354,8 +357,8 @@ export default function TaskCard({
               Mark done
             </button>
           </div>
-        )
-      }
+        </div>
+      )}
     </div >
   );
 }

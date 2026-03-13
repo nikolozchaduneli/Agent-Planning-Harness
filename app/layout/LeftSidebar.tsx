@@ -166,7 +166,7 @@ export default function LeftSidebar({ isOpen, onToggle }: LeftSidebarProps) {
             if (showProjectDropdown) setShowProjectDropdown(false);
           }}
         >
-          <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="mb-4 flex items-center justify-between gap-2 pl-9">
             <h1 className="text-sm font-semibold text-[var(--muted)]">
               Planner
             </h1>
