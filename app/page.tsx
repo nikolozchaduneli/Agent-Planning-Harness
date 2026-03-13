@@ -12,6 +12,20 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
+      // Prefer server state so MCP agent changes are reflected on reload
+      try {
+        const res = await fetch("/api/mcp/sync");
+        if (res.ok) {
+          const serverState = await res.json();
+          if (serverState) {
+            hydrate(serverState);
+            await saveState(serverState);
+            return;
+          }
+        }
+      } catch {
+        // fall through to local storage
+      }
       const stored = await loadState();
       if (stored) {
         hydrate(stored);
@@ -29,6 +43,12 @@ export default function Home() {
       }
       saveTimer.current = setTimeout(() => {
         saveState(state);
+        // Keep server-side state in sync so MCP server sees latest data
+        fetch("/api/mcp/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state),
+        }).catch(() => {});
       }, 300);
     });
     return () => unsub();

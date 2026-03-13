@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "task-planner": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "PLANNER_URL": "http://localhost:3000"
+      }
+    }
+  }
+}

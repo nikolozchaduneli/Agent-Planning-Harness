@@ -7,7 +7,10 @@
     "dev": "node scripts/dev.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mcp:install": "cd mcp-server && npm install",
+    "mcp:build": "cd mcp-server && npm run build",
+    "mcp:start": "node mcp-server/dist/index.js"
   },
   "dependencies": {
     "idb": "^8.0.3",

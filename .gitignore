@@ -55,3 +55,10 @@ output/playwright/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mcp server build artifacts
+/mcp-server/dist/
+/mcp-server/node_modules/
+
+# local planner data (user data, not for committing)
+/data/
