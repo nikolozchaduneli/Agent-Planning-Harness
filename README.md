@@ -17,6 +17,13 @@ This project is building that layer.
 - **Activity feed as communication channel** — agent notes appear in the browser UI in real time. No external notification system required.
 - **Real-time sync** — agent changes propagate to the browser within ~1 second via SSE, no reload required. A dirty-flag mechanism prevents feedback loops between browser and agent writes.
 
+**Phase 3 (next):** Full agent automation with an in-app control panel. You spawn agents from the browser, they run against the plan autonomously, and you watch them work in real time — no terminal required.
+
+- **Agent panel** — a dedicated view showing every active agent: which task it's on, how long it's been running, and a live tail of its activity log.
+- **Spawn from UI** — pick a task or milestone, choose a model, launch. The planner wires up the MCP context automatically.
+- **Interrupt and redirect** — pause a running agent, reassign its task, or inject a note it will pick up on its next tool call.
+- **Multi-agent coordination** — multiple agents claim different tasks from the same plan without collision; the planner arbitrates via `pick_task` locks.
+
 The end state is a system where you sketch a project idea over coffee, the planner breaks it into milestones and tasks, and agents execute against it — with you reviewing progress, not managing process.
 
 ## How it works today
@@ -33,6 +40,12 @@ Everything is stored in your browser (IndexedDB). No account, no server, no data
 | Drawing Board | Plan | Focus |
 |---|---|---|
 | ![Drawing Board](docs/ui/gif-01-drawing-board.gif) | ![Plan](docs/ui/gif-02-plan-tasks.gif) | ![Focus](docs/ui/gif-03-focus-prompt.gif) |
+
+**MCP agent integration (Phase 2)**
+
+| Task lifecycle | Agent creates a task |
+|---|---|
+| ![MCP task lifecycle](docs/ui/gif-04-mcp-task-lifecycle.gif) | ![MCP create task](docs/ui/gif-05-mcp-create-task.gif) |
 
 ## Run locally
 
